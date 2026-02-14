@@ -1,9 +1,10 @@
 ## Author: Quade Martin
 ## Last Updated: 2-12-2026
 ## Description: Entry Terminal class for Phonon laser tag game. 
-##              Provides a GUI for entering player names and IDs for red and green teams.
+##              Provides a GUI for entering player names and codenames for red and green teams.
 
 import tkinter as tk  ## GUI framework for the application window
+from tkinter import messagebox  ## Message boxes for dialogs
 import os  ## File system operations
 from PIL import Image, ImageTk
 
@@ -21,6 +22,7 @@ class EntryTerminal:
 
         self.red_entries = []
         self.green_entries = []
+        self.hardware_ids = {}  ## Dictionary to store (player_id, codename) -> hardware_id mappings
 
         self._build_ui()
 
@@ -112,7 +114,7 @@ class EntryTerminal:
 
         label_name = tk.Label(
             outer,
-            text="Name",
+            text="Player ID",
             font=("Arial", 9, "bold"),
             fg="#dfe8f2",
             bg=team_color,
@@ -121,7 +123,7 @@ class EntryTerminal:
 
         label_code = tk.Label(
             outer,
-            text="ID",
+            text="Codename",
             font=("Arial", 9, "bold"),
             fg="#dfe8f2",
             bg=team_color,
@@ -158,6 +160,9 @@ class EntryTerminal:
                 relief=tk.FLAT,
             )
             code_entry.grid(row=row_index, column=2, sticky="ew", padx=(2, 6), pady=3, ipady=3)
+            
+            ## Bind FocusOut event to check for hardware ID when codename is entered
+            code_entry.bind("<FocusOut>", lambda e, n=name_entry, c=code_entry: self._on_codename_entered(n, c))
 
             entries_list.append((name_entry, code_entry))
 
@@ -170,15 +175,15 @@ class EntryTerminal:
         Collect all entered player data from both teams.
 
         Returns:
-            list: List of tuples containing (team, slot, name, ID) for each player
+            list: List of tuples containing (team, slot, player_id, codename) for each player
         """
         rows = []
         for team_name, entries in (("Red", self.red_entries), ("Green", self.green_entries)):
             for index, (name_entry, code_entry) in enumerate(entries, start=1):
                 name = name_entry.get().strip()
-                player_id = code_entry.get().strip()
-                if name or player_id:
-                    rows.append((team_name, index, name, player_id))
+                player_codename = code_entry.get().strip()
+                if name or player_codename:
+                    rows.append((team_name, index, name, player_codename))
         return rows
 
     def get_entries(self):
@@ -186,9 +191,156 @@ class EntryTerminal:
         Get all entered player data.
         
         Returns:
-            list: List of tuples containing (team, slot, name, ID) for each player
+            list: List of tuples containing (team, slot, player_id, codename) for each player
         """
         return self._collect_entries()
+
+    def _on_codename_entered(self, name_entry: tk.Entry, code_entry: tk.Entry) -> None:
+        """
+        Called when codename field loses focus. Checks if both player ID and codename
+        are filled, and prompts for hardware ID if not already registered.
+        
+        Args:
+            name_entry: The player ID entry widget
+            code_entry: The codename entry widget
+        """
+        player_id = name_entry.get().strip()
+        codename = code_entry.get().strip()
+        
+        ## Only proceed if both fields are filled
+        if not player_id or not codename:
+            return
+        
+        ## Create a unique key for this player
+        player_key = (player_id, codename)
+        
+        ## Check if hardware ID already registered for this player
+        if player_key in self.hardware_ids:
+            return
+        
+        ## Show popup to get hardware ID
+        hardware_id = self._show_hardware_id_popup(player_id, codename)
+        
+        if hardware_id:
+            self.hardware_ids[player_key] = hardware_id
+    
+    def _show_hardware_id_popup(self, player_id: str, codename: str) -> str:
+        """
+        Display a popup dialog to register a hardware ID for a player.
+        
+        Args:
+            player_id: The player's ID
+            codename: The player's codename
+            
+        Returns:
+            str: The hardware ID entered by the user, or None if cancelled
+        """
+        popup = tk.Toplevel(self.root)
+        popup.title("Hardware ID Required")
+        popup.geometry("450x220")
+        popup.configure(bg="#1a1a1a")
+        popup.resizable(False, False)
+        
+        ## Center the popup on screen
+        popup.transient(self.root)
+        popup.grab_set()
+        
+        ## Header label
+        header = tk.Label(
+            popup,
+            text="Link Hardware ID",
+            font=("Arial", 14, "bold"),
+            fg="#51ff7a",
+            bg="#1a1a1a"
+        )
+        header.pack(pady=(20, 5))
+        
+        ## Info label
+        info = tk.Label(
+            popup,
+            text=f"Player ID: {player_id}\nCodename: {codename}\n\nPlease scan or enter the hardware ID:",
+            font=("Arial", 10),
+            fg="#d3d3d3",
+            bg="#1a1a1a",
+            justify=tk.CENTER
+        )
+        info.pack(pady=(5, 15))
+        
+        ## Entry field for hardware ID
+        hardware_entry = tk.Entry(
+            popup,
+            font=("Arial", 11),
+            bg="#f5f5f5",
+            fg="#111111",
+            relief=tk.FLAT,
+            width=30
+        )
+        hardware_entry.pack(pady=10, ipady=4)
+        hardware_entry.focus_set()
+        
+        result = {"hardware_id": None}
+        
+        def on_submit():
+            hardware_id = hardware_entry.get().strip()
+            if not hardware_id:
+                messagebox.showwarning(
+                    "Invalid Input",
+                    "Hardware ID cannot be empty.",
+                    parent=popup
+                )
+                return
+            result["hardware_id"] = hardware_id
+            popup.destroy()
+        
+        def on_cancel():
+            popup.destroy()
+        
+        ## Button frame
+        button_frame = tk.Frame(popup, bg="#1a1a1a")
+        button_frame.pack(pady=15)
+        
+        ## Submit button
+        submit_btn = tk.Button(
+            button_frame,
+            text="Link Hardware",
+            font=("Arial", 10, "bold"),
+            bg="#51ff7a",
+            fg="#111111",
+            relief=tk.FLAT,
+            width=12,
+            command=on_submit
+        )
+        submit_btn.grid(row=0, column=0, padx=5)
+        
+        ## Cancel button
+        cancel_btn = tk.Button(
+            button_frame,
+            text="Skip",
+            font=("Arial", 10),
+            bg="#4a4a4a",
+            fg="#d3d3d3",
+            relief=tk.FLAT,
+            width=12,
+            command=on_cancel
+        )
+        cancel_btn.grid(row=0, column=1, padx=5)
+        
+        ## Bind Enter key to submit
+        hardware_entry.bind("<Return>", lambda e: on_submit())
+        
+        ## Wait for popup to close
+        popup.wait_window()
+        
+        return result["hardware_id"]
+    
+    def get_hardware_ids(self) -> dict:
+        """
+        Get the dictionary of all registered hardware IDs.
+        
+        Returns:
+            dict: Dictionary mapping (player_id, codename) tuples to hardware IDs
+        """
+        return self.hardware_ids.copy()
 
     ## Test method to save entries to CSV
     # def save_to_csv(self) -> None:
@@ -209,7 +361,7 @@ class EntryTerminal:
     #     try:
     #         with open(output_file, "w", newline="", encoding="utf-8") as csv_file:
     #             writer = csv.writer(csv_file)
-    #             writer.writerow(["team", "slot", "name", "ID"])
+    #             writer.writerow(["team", "slot", "player_id", "codename"])
     #             writer.writerows(rows)
 
     #         messagebox.showinfo(
