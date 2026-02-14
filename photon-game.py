@@ -6,6 +6,7 @@ from entry_screen import EntryTerminal
 import os
 
 # Define connection parameters
+## Uncomment bottom lines if you're coding locally
 connection_params = {
     'dbname': 'photon',
     'user': 'student',
