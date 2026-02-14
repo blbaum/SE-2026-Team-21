@@ -5,9 +5,9 @@ from psycopg2 import sql
 connection_params = {
     'dbname': 'photon',
     'user': 'student',
-    #'password': 'student',
-    #'host': 'localhost',
-    #'port': '5432'
+    'password': 'student',
+    'host': 'localhost',
+    'port': '5432'
 }
 
 try:
@@ -33,10 +33,10 @@ try:
     #''')
 
     # Insert sample data
-    cursor.execute('''
-        INSERT INTO players (id, codename)
-        VALUES (%s, %s);
-    ''', ('500', 'BhodiLi'))
+    # cursor.execute('''
+    #     INSERT INTO players (id, codename)
+    #     VALUES (%s, %s);
+    # ''', ('500', 'BhodiLi'))
 
     # Commit the changes
     conn.commit()

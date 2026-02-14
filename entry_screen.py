@@ -7,6 +7,7 @@ import tkinter as tk  ## GUI framework for the application window
 from tkinter import messagebox  ## Message boxes for dialogs
 import os  ## File system operations
 from PIL import Image, ImageTk
+import psycopg2  ## PostgreSQL database stuff
 
 ## Entry terminal class for Photon laser tag game
 class EntryTerminal:
@@ -23,6 +24,15 @@ class EntryTerminal:
         self.red_entries = []
         self.green_entries = []
         self.hardware_ids = {}  ## Dictionary to store (player_id, codename) -> hardware_id mappings
+        
+        ## Database connection parameters
+        self.db_params = {
+            'dbname': 'photon',
+            'user': 'student',
+            'password': 'student',
+            'host': 'localhost',
+            'port': '5432'
+        }
 
         self._build_ui()
 
@@ -341,6 +351,28 @@ class EntryTerminal:
             dict: Dictionary mapping (player_id, codename) tuples to hardware IDs
         """
         return self.hardware_ids.copy()
+    
+    def get_player_by_id(self, player_id: str):
+        """
+        Retrieve a specific player from the database by ID.
+        
+        Args:
+            player_id: The player's ID
+            
+        Returns:
+            tuple: (id, codename) if found, None otherwise
+        """
+        try:
+            conn = psycopg2.connect(**self.db_params)
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, codename FROM players WHERE id = %s;", (player_id,))
+            row = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            return row
+        except Exception as error:
+            messagebox.showerror("Database Error", f"Failed to retrieve player: {error}")
+            return None
 
     ## Test method to save entries to CSV
     # def save_to_csv(self) -> None:
@@ -371,6 +403,32 @@ class EntryTerminal:
     #     except Exception as exc:
     #         messagebox.showerror("Error", f"Failed to save CSV:\n{exc}")
 
+    def save_to_database(self) -> None:
+        """
+        Save all entered player data to the PostgreSQL database.
+        """
+        rows = self._collect_entries()
+        if not rows:
+            messagebox.showwarning("No Data Saved", "No player data to save.")
+            return
+
+        try:
+            conn = psycopg2.connect(**self.db_params)
+            cursor = conn.cursor()
+
+            for team_name, slot, player_id, codename in rows:
+                cursor.execute(
+                    "INSERT INTO players (id, codename) VALUES (%s, %s);",
+                    (player_id, codename)
+                )
+
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+            messagebox.showinfo("Saved", f"Saved {len(rows)} player(s) to the database.")
+        except Exception as error:
+            messagebox.showerror("Database Error", f"Failed to save players: {error}")
 
 def main():
     """Main entry point for the application"""
