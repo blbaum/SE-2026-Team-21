@@ -26,12 +26,13 @@ class EntryTerminal:
         self.hardware_ids = {}  ## Dictionary to store (player_id, codename) -> hardware_id mappings
         
         ## Database connection parameters
+        ## Uncomment bottom lines if you're coding locally
         self.db_params = {
             'dbname': 'photon',
             'user': 'student',
-            'password': 'student',
-            'host': 'localhost',
-            'port': '5432'
+            # 'password': 'student',
+            # 'host': 'localhost',
+            # 'port': '5432'
         }
 
         self._build_ui()

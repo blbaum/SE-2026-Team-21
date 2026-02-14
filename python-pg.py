@@ -2,12 +2,13 @@ import psycopg2
 from psycopg2 import sql
 
 # Define connection parameters
+## Uncomment bottom lines if you're coding locally
 connection_params = {
     'dbname': 'photon',
     'user': 'student',
-    'password': 'student',
-    'host': 'localhost',
-    'port': '5432'
+    # 'password': 'student',
+    # 'host': 'localhost',
+    # 'port': '5432'
 }
 
 try:
