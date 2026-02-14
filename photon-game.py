@@ -67,6 +67,8 @@ def main():
         """Handle window closing event - save data before closing"""
         if entry_terminal:
             entry_terminal.save_to_database()
+            # Uncomment below to clear database on close
+            # entry_terminal.clear_database()
         root.destroy()
 
     root.after(2500, show_main)

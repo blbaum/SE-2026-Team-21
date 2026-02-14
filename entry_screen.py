@@ -429,6 +429,25 @@ class EntryTerminal:
             messagebox.showinfo("Saved", f"Saved {len(rows)} player(s) to the database.")
         except Exception as error:
             messagebox.showerror("Database Error", f"Failed to save players: {error}")
+    
+    def clear_database(self) -> None:
+        """
+        Clear all player data from the database. Use with caution!
+        """
+        if not messagebox.askyesno("Confirm Clear", "Are you sure you want to clear all player data from the database? This action cannot be undone."):
+            return
+
+        try:
+            conn = psycopg2.connect(**self.db_params)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM players;")
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+            messagebox.showinfo("Database Cleared", "All player data has been cleared from the database.")
+        except Exception as error:
+            messagebox.showerror("Database Error", f"Failed to clear database: {error}")
 
 def main():
     """Main entry point for the application"""
