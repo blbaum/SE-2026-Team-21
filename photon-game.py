@@ -3,6 +3,7 @@ from psycopg2 import sql
 import tkinter as tk
 from PIL import Image, ImageTk
 from entry_screen import EntryTerminal
+from udp_files.udp import UDP
 import os
 
 # Define connection parameters
@@ -16,6 +17,8 @@ connection_params = {
 }
 
 def main():
+    """Make instance of UDP class"""
+    udp = UDP()
     """Main entry point for the application"""
     root = tk.Tk()
     root.withdraw()
@@ -59,10 +62,11 @@ def main():
     entry_terminal = None  # Store reference to entry terminal
 
     def show_main():
+        udp.setup_sockets()
         nonlocal entry_terminal
         splash.destroy()
         root.deiconify()
-        entry_terminal = EntryTerminal(root)
+        entry_terminal = EntryTerminal(root, udp)
 
     def on_closing():
         """Handle window closing event - save data before closing"""
@@ -75,6 +79,7 @@ def main():
     root.after(2500, show_main)
     root.protocol("WM_DELETE_WINDOW", on_closing)
     root.mainloop()
+    udp.close_sockets()
 
 if __name__ == "__main__":
     main()

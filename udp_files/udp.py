@@ -1,38 +1,54 @@
 import socket
+# import threading
 
 class UDP:
-    local_ip = "0.0.0.0"
-    buffer_size = 1024
+    def __init__(self, send_port=7500, receive_port=7501, receive_ip="0.0.0.0", send_ip="127.0.0.1"):
+        self.receive_port = receive_port
+        self.receive_sock = None
+        self.receive_ip = receive_ip
 
-    def __init__(self, client=7500, server=7501):
-        self.server_port = server
-        self.server_sock = None
-        self.server_ip = "127.0.0.1"
-        self.server_address = (self.server_ip, self.server_port)
+        self.send_ip = send_ip
+        self.send_port = send_port
+        self.send_address = (self.send_ip, self.send_port)
+        self.send_sock = None
 
-        self.client_port = client
-        self.client_sock = None
+        self.buffer_size = 1024
 
-    def start(self):
-        self.server_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
-        self.server_sock.bind((UDP.local_ip, self.server_port))
+    def setup_sockets(self):
+        self.receive_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+        self.receive_sock.bind((self.receive_ip, self.receive_port))
 
-        self.client_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
-        self.client_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self.send_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+        self.send_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
-        print(f"Server listening at: {UDP.local_ip}:{self.server_port}")
-        print(f"Client sending from port: {self.client_port} to IP: ")
+        print(f"Receive socket listening at: {self.receive_ip}:{self.receive_port}")
+        print(f"Send socket sending to: {self.send_ip}:{self.receive_port}")
 
-    def update_server_address(self, new_ip):
-        self.server_ip = new_ip
-        self.server_address = (self.server_ip, self.server_port)
-        print(f"Server address updated to {self.server_ip}:{self.server_port}")
+    def update_server_ip(self, new_ip):
+        self.send_ip = new_ip
+        self.send_address = (self.send_ip, self.receive_port)
+        print(f"Send address updated to {self.send_ip}:{self.receive_port}")
 
     def send_data(self, data):
-        if self.client_sock is None:
+        if self.send_sock is None:
             print("Setup UDP to send data")
             return
 
         encoded_data = str.encode(data)
-        self.client_sock.sendto(encoded_data, self.server_address)
-        print(f"Client Sent: {encoded_data.decode()}")
+        self.send_sock.sendto(encoded_data, self.send_address)
+        print(f"Sent: {encoded_data.decode()}")
+        print(f"To: {self.send_ip}:{self.receive_port}")
+
+    def close_sockets(self):
+        try:
+            if(self.receive_sock != None):
+                self.receive_sock.close()
+                print("Receive socket closed")
+            if(self.send_sock != None):
+                self.send_sock.close()
+                print("Send socket closed")
+        except Exception as e:
+            print(e)
+
+    def get_server_ip(self):
+        return self.send_ip
