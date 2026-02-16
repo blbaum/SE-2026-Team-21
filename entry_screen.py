@@ -14,7 +14,7 @@ class EntryTerminal:
     """Laser tag entry terminal for red/green teams."""
 
     ## Initialize the entry terminal
-    def __init__(self, root: tk.Tk) -> None:
+    def __init__(self, root: tk.Tk, udp) -> None:
         self.root = root
         self.root.title("Entry Terminal")
         self.root.geometry("1100x680")
@@ -26,15 +26,17 @@ class EntryTerminal:
         self.hardware_ids = {}  ## Dictionary to store (player_id, codename) -> hardware_id mappings
         
         ## Database connection parameters
+        ## Uncomment bottom lines if you're coding locally
         self.db_params = {
             'dbname': 'photon',
             'user': 'student',
-            'password': 'student',
-            'host': 'localhost',
-            'port': '5432'
+            # 'password': 'student',
+            # 'host': 'localhost',
+            # 'port': '5432'
         }
 
         self._build_ui()
+        self.udp = udp
 
     ## Build the user interface
     def _build_ui(self) -> None:
@@ -60,6 +62,28 @@ class EntryTerminal:
             bg="#0b0b0b",
         )
         subtitle.pack(pady=(2, 0))
+
+        # Network Input
+        network_button = tk.Button(
+            header_frame,
+            text = "Update Network",
+            font=("Arial", 10, "bold"),
+            fg="#6aa7ff",
+            bg="#0b0b0b",
+            command=self.update_network_address,
+        )
+        network_button.pack(side=tk.RIGHT, padx=(0, 24))
+
+        self.network_field = tk.Entry(
+            header_frame,
+            font=("Arial", 10, "bold"),
+            fg="#6aa7ff",
+            bg="#0b0b0b",
+            justify="center"
+        )
+        self.network_field.pack(side=tk.RIGHT, padx=(0, 10))
+        self.network_field.insert(10, "")
+        
 
         ## Content frame to hold team frames
         content_frame = tk.Frame(self.root, bg="#0b0b0b")
@@ -301,6 +325,7 @@ class EntryTerminal:
                 return
             result["hardware_id"] = hardware_id
             popup.destroy()
+            self.udp.send_data(hardware_id)
         
         def on_cancel():
             popup.destroy()
@@ -448,6 +473,10 @@ class EntryTerminal:
             messagebox.showinfo("Database Cleared", "All player data has been cleared from the database.")
         except Exception as error:
             messagebox.showerror("Database Error", f"Failed to clear database: {error}")
+
+    def update_network_address(self):
+        network_ip = self.network_field.get().strip()
+        self.udp.update_server_ip(network_ip)
 
 def main():
     """Main entry point for the application"""
