@@ -37,4 +37,3 @@ Members of this project include (Name - Github Username):
 * Quade Martin - qmmartin
 * Brayden Werner - Bw097
 
->>>>>>> main
