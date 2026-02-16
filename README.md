@@ -7,6 +7,19 @@ Required Librarires and instructions:
 - Install imageTK | sudo apt-get install python3-pil.imagetk
 - Install pyscopg2 | sudo apt install python3-psycopg2
 
+* Bryant Baum - blbaum
+* Luis Silva - NimbusLuis
+* Kolton McAllister - KoltMc
+* Quade Martin - qmmatrin
+* Brayden Werner - bw097
+
+HOW TO RUN THE PROJECT:
+
+Run the install script for dependencies using:
+./install.sh
+
+Run the main entry poinnt for the application using:
+python3 photon-game.py
 How to Run Game:
 python3 photon-game.py
 
