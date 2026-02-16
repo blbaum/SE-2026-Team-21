@@ -7,7 +7,6 @@ Required Librarires and instructions:
 - Install imageTK | sudo apt-get install python3-pil.imagetk
 - Install pyscopg2 | sudo apt install python3-psycopg2
 
-<<<<<<< HEAD
 * Bryant Baum - blbaum
 * Luis Silva - NimbusLuis
 * Kolton McAllister - KoltMc
