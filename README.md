@@ -20,7 +20,6 @@ Run the install script for dependencies using:
 
 Run the main entry poinnt for the application using:
 python3 photon-game.py
-=======
 How to Run Game:
 python3 photon-game.py
 
