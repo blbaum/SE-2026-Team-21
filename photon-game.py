@@ -1,8 +1,7 @@
-import psycopg2
-from psycopg2 import sql
 import tkinter as tk
 from PIL import Image, ImageTk
 from entry_screen import EntryTerminal
+from action_screen import ActionScreen
 from udp_files.udp import UDP
 import os
 
@@ -60,13 +59,16 @@ def main():
     splash.geometry(f"{splash_width}x{splash_height}+{x}+{y}")
 
     entry_terminal = None  # Store reference to entry terminal
+    action_screen = None
 
     def show_main():
         udp.setup_sockets()
         nonlocal entry_terminal
+        nonlocal action_screen
         splash.destroy()
         root.deiconify()
-        entry_terminal = EntryTerminal(root, udp)
+        entry_terminal = EntryTerminal(root, udp) 
+        # action_screen = ActionScreen(root) # comment above and uncomment this to show action screen
 
     def on_closing():
         """Handle window closing event - save data before closing"""
