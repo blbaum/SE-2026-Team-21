@@ -60,6 +60,26 @@ def main():
 
     entry_terminal = None  # Store reference to entry terminal
     action_screen = None
+    action_screen_is_up = False
+    def key_press_handler(event):
+        key = event.char
+        keysym = event.keysym
+        keycode = event.keycode
+
+        nonlocal action_screen_is_up
+        nonlocal entry_terminal
+        nonlocal action_screen
+
+        if(keysym == 'F5'):
+            if(action_screen_is_up):
+                action_screen_is_up = False
+                entry_terminal.show()
+                action_screen.hide()
+
+            else:
+                action_screen_is_up = True
+                entry_terminal.hide()
+                action_screen.show()
 
     def show_main():
         udp.setup_sockets()
@@ -68,7 +88,8 @@ def main():
         splash.destroy()
         root.deiconify()
         entry_terminal = EntryTerminal(root, udp) 
-        # action_screen = ActionScreen(root) # comment above and uncomment this to show action screen
+        action_screen = ActionScreen(root) # comment above and uncomment this to show action screen
+        action_screen.hide()
 
     def on_closing():
         """Handle window closing event - save data before closing"""
@@ -80,6 +101,7 @@ def main():
 
     root.after(2500, show_main)
     root.protocol("WM_DELETE_WINDOW", on_closing)
+    root.bind("<Key>", key_press_handler)
     root.mainloop()
     udp.close_sockets()
 
