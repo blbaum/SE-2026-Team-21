@@ -8,6 +8,7 @@ from tkinter import messagebox  ## Message boxes for dialogs
 import os  ## File system operations
 from PIL import Image, ImageTk
 import psycopg2  ## PostgreSQL database stuff
+from udp_files.udp import UDP
 
 ## Entry terminal class for Photon laser tag game
 class EntryTerminal:
@@ -24,7 +25,9 @@ class EntryTerminal:
         self.red_entries = []
         self.green_entries = []
         self.hardware_ids = {}  ## Dictionary to store (player_id, codename) -> hardware_id mappings
-        
+        self._codename_popup_open = False  ## Flag to track if the codename popup is currently open
+        self.udp = udp
+
         ## Database connection parameters
         ## Uncomment bottom lines if you're coding locally
         self.db_params = {
@@ -41,7 +44,6 @@ class EntryTerminal:
         self.status_frame = None
 
         self._build_ui()
-        self.udp = udp
 
     # Hide all frames using forget()
     def hide(self) -> None:
@@ -161,7 +163,7 @@ class EntryTerminal:
             fg=accent,
             bg=team_color,
         )
-        header.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(8, 6))
+        header.grid(row=0, column=0, columnspan=4, sticky="ew", pady=(8, 6))
 
         label_name = tk.Label(
             outer,
@@ -180,6 +182,15 @@ class EntryTerminal:
             bg=team_color,
         )
         label_code.grid(row=1, column=2, sticky="w", padx=(2, 6), pady=(0, 6))
+
+        label_hardware = tk.Label(
+            outer,
+            text="Hardware ID",
+            font=("Arial", 9, "bold"),
+            fg="#dfe8f2",
+            bg=team_color,
+        )
+        label_hardware.grid(row=1, column=3, sticky="w", padx=(2, 6), pady=(0, 6))
 
         for i in range(15):
             row_index = i + 2
@@ -209,16 +220,36 @@ class EntryTerminal:
                 bg="#f5f5f5",
                 fg="#111111",
                 relief=tk.FLAT,
+                state="readonly",
             )
             code_entry.grid(row=row_index, column=2, sticky="ew", padx=(2, 6), pady=3, ipady=3)
-            
-            ## Bind FocusOut event to check for hardware ID when codename is entered
-            code_entry.bind("<FocusOut>", lambda e, n=name_entry, c=code_entry: self._on_codename_entered(n, c))
 
-            entries_list.append((name_entry, code_entry))
+            hardware_entry = tk.Entry(
+                outer,
+                font=("Arial", 9),
+                bg="#f5f5f5",
+                fg="#111111",
+                relief=tk.FLAT,
+            )
+            hardware_entry.grid(row=row_index, column=3, sticky="ew", padx=(2, 6), pady=3, ipady=3)
+
+            ## Bind Player ID to automatic codename lookup
+            name_entry.bind("<FocusOut>", lambda e, n=name_entry, c=code_entry: self._on_player_id_entered(n, c))
+            name_entry.bind("<Return>", lambda e, n=name_entry, c=code_entry: self._on_player_id_entered(n, c))
+            hardware_entry.bind(
+                "<FocusOut>",
+                lambda e, n=name_entry, c=code_entry, h=hardware_entry: self._on_hardware_id_entered(n, c, h)
+            )
+            hardware_entry.bind(
+                "<Return>",
+                lambda e, n=name_entry, c=code_entry, h=hardware_entry: self._on_hardware_id_entered(n, c, h)
+            )
+
+            entries_list.append((name_entry, code_entry, hardware_entry))
 
         outer.columnconfigure(1, weight=1)
         outer.columnconfigure(2, weight=1)
+        outer.columnconfigure(3, weight=1)
         return outer
 
     def _collect_entries(self):
@@ -229,12 +260,18 @@ class EntryTerminal:
             list: List of tuples containing (team, slot, player_id, codename) for each player
         """
         rows = []
+        self.hardware_ids = {}
         for team_name, entries in (("Red", self.red_entries), ("Green", self.green_entries)):
-            for index, (name_entry, code_entry) in enumerate(entries, start=1):
-                name = name_entry.get().strip()
+            for index, (name_entry, code_entry, hardware_entry) in enumerate(entries, start=1):
+                player_id = name_entry.get().strip()
                 player_codename = code_entry.get().strip()
-                if name or player_codename:
-                    rows.append((team_name, index, name, player_codename))
+                hardware_id = hardware_entry.get().strip()
+
+                if player_id or player_codename or hardware_id:
+                    rows.append((team_name, index, player_id, player_codename))
+
+                if player_id and player_codename and hardware_id:
+                    self.hardware_ids[(player_id, player_codename)] = hardware_id
         return rows
 
     def get_entries(self):
@@ -246,79 +283,104 @@ class EntryTerminal:
         """
         return self._collect_entries()
 
-    def _on_codename_entered(self, name_entry: tk.Entry, code_entry: tk.Entry) -> None:
+    def _set_codename_entry(self, code_entry: tk.Entry, codename: str) -> None:
+        code_entry.configure(state=tk.NORMAL)
+        code_entry.delete(0, tk.END)
+        if codename:
+            code_entry.insert(0, codename)
+        code_entry.configure(state="readonly")
+
+    def _on_player_id_entered(self, name_entry: tk.Entry, code_entry: tk.Entry) -> None:
         """
-        Called when codename field loses focus. Checks if both player ID and codename
-        are filled, and prompts for hardware ID if not already registered.
-        
+        Called when Player ID loses focus or Enter is pressed.
+        Loads codename from DB; if not found, prompts user for a codename.
+
         Args:
             name_entry: The player ID entry widget
             code_entry: The codename entry widget
         """
         player_id = name_entry.get().strip()
-        codename = code_entry.get().strip()
-        
-        ## Only proceed if both fields are filled
-        if not player_id or not codename:
+
+        previous_player_id = getattr(name_entry, "_last_player_id", None)
+        if previous_player_id != player_id:
+            setattr(name_entry, "_skip_missing_codename_for", None)
+        setattr(name_entry, "_last_player_id", player_id)
+
+        if self._codename_popup_open:
             return
-        
-        ## Create a unique key for this player
-        player_key = (player_id, codename)
-        
-        ## Check if hardware ID already registered for this player
-        if player_key in self.hardware_ids:
+
+        if not player_id:
+            self._set_codename_entry(code_entry, "")
             return
-        
-        ## Show popup to get hardware ID
-        hardware_id = self._show_hardware_id_popup(player_id, codename)
-        
-        if hardware_id:
-            self.hardware_ids[player_key] = hardware_id
-    
-    def _show_hardware_id_popup(self, player_id: str, codename: str) -> str:
+
+        current_codename = code_entry.get().strip()
+        if current_codename and previous_player_id == player_id:
+            return
+
+        skipped_player_id = getattr(name_entry, "_skip_missing_codename_for", None)
+        if skipped_player_id == player_id:
+            return
+
+        player_row = self.get_player_by_id(player_id)
+        if player_row and player_row[1]:
+            self._set_codename_entry(code_entry, player_row[1])
+            setattr(name_entry, "_skip_missing_codename_for", None)
+            return
+
+        self._codename_popup_open = True
+        codename = self._show_codename_popup(player_id)
+        self._codename_popup_open = False
+
+        if not codename:
+            self._set_codename_entry(code_entry, "")
+            setattr(name_entry, "_skip_missing_codename_for", player_id)
+            return
+
+        self._set_codename_entry(code_entry, codename)
+        setattr(name_entry, "_skip_missing_codename_for", None)
+
+    def _show_codename_popup(self, player_id: str) -> str:
         """
-        Display a popup dialog to register a hardware ID for a player.
-        
+        Display a popup dialog to register a codename for a player when not found in DB.
+
         Args:
             player_id: The player's ID
-            codename: The player's codename
-            
         Returns:
-            str: The hardware ID entered by the user, or None if cancelled
+            str: The codename entered by the user, or None if cancelled
         """
         popup = tk.Toplevel(self.root)
-        popup.title("Hardware ID Required")
-        popup.geometry("450x220")
+        popup.title("Codename Required")
+        popup.geometry("450x240")
         popup.configure(bg="#1a1a1a")
         popup.resizable(False, False)
-        
+
         ## Center the popup on screen
         popup.transient(self.root)
         popup.grab_set()
-        
+
         ## Header label
         header = tk.Label(
             popup,
-            text="Link Hardware ID",
+            text="Create Codename",
             font=("Arial", 14, "bold"),
             fg="#51ff7a",
             bg="#1a1a1a"
         )
         header.pack(pady=(20, 5))
-        
+
         ## Info label
         info = tk.Label(
             popup,
-            text=f"Player ID: {player_id}\nCodename: {codename}\n\nPlease scan or enter the hardware ID:",
+            text=f"No codename found for Player ID: {player_id}\n\nPlease enter a codename:",
             font=("Arial", 10),
             fg="#d3d3d3",
             bg="#1a1a1a",
             justify=tk.CENTER
         )
         info.pack(pady=(5, 15))
-        
-        ## Entry field for hardware ID
-        hardware_entry = tk.Entry(
+
+        ## Entry field for codename
+        codename_entry = tk.Entry(
             popup,
             font=("Arial", 11),
             bg="#f5f5f5",
@@ -326,35 +388,36 @@ class EntryTerminal:
             relief=tk.FLAT,
             width=30
         )
-        hardware_entry.pack(pady=10, ipady=4)
-        hardware_entry.focus_set()
-        
-        result = {"hardware_id": None}
-        
+        codename_entry.pack(pady=10, ipady=4)
+        codename_entry.focus_set()
+
+        result = {"codename": None}
+
+        ## On submitting the codename, validate and store it
         def on_submit():
-            hardware_id = hardware_entry.get().strip()
-            if not hardware_id:
+            codename = codename_entry.get().strip()
+            if not codename:
                 messagebox.showwarning(
                     "Invalid Input",
-                    "Hardware ID cannot be empty.",
+                    "Codename cannot be empty.",
                     parent=popup
                 )
                 return
-            result["hardware_id"] = hardware_id
+            result["codename"] = codename
             popup.destroy()
-            self.udp.send_data(hardware_id)
-        
+
+        ## On cancelling the popup, just close it without saving
         def on_cancel():
             popup.destroy()
-        
+
         ## Button frame
         button_frame = tk.Frame(popup, bg="#1a1a1a")
         button_frame.pack(pady=15)
-        
+
         ## Submit button
         submit_btn = tk.Button(
             button_frame,
-            text="Link Hardware",
+            text="Save Codename",
             font=("Arial", 10, "bold"),
             bg="#51ff7a",
             fg="#111111",
@@ -363,7 +426,7 @@ class EntryTerminal:
             command=on_submit
         )
         submit_btn.grid(row=0, column=0, padx=5)
-        
+
         ## Cancel button
         cancel_btn = tk.Button(
             button_frame,
@@ -376,15 +439,34 @@ class EntryTerminal:
             command=on_cancel
         )
         cancel_btn.grid(row=0, column=1, padx=5)
-        
+
         ## Bind Enter key to submit
-        hardware_entry.bind("<Return>", lambda e: on_submit())
-        
+        codename_entry.bind("<Return>", lambda e: on_submit())
+
         ## Wait for popup to close
         popup.wait_window()
-        
-        return result["hardware_id"]
-    
+
+        return result["codename"]
+
+    def _on_hardware_id_entered(self, name_entry: tk.Entry, code_entry: tk.Entry, hardware_entry: tk.Entry) -> None:
+        """
+        Called when hardware ID loses focus or Enter is pressed.
+        Registers the hardware ID for the player and sends it through UDP.
+        """
+        player_id = name_entry.get().strip()
+        codename = code_entry.get().strip()
+        hardware_id = hardware_entry.get().strip()
+
+        if not player_id or not codename or not hardware_id:
+            return
+
+        player_key = (player_id, codename)
+        if self.hardware_ids.get(player_key) == hardware_id:
+            return
+
+        self.hardware_ids[player_key] = hardware_id
+        self.udp.send_data(hardware_id)
+
     def get_hardware_ids(self) -> dict:
         """
         Get the dictionary of all registered hardware IDs.
@@ -392,8 +474,9 @@ class EntryTerminal:
         Returns:
             dict: Dictionary mapping (player_id, codename) tuples to hardware IDs
         """
+        self._collect_entries()
         return self.hardware_ids.copy()
-    
+
     def get_player_by_id(self, player_id: str):
         """
         Retrieve a specific player from the database by ID.
@@ -415,35 +498,6 @@ class EntryTerminal:
         except Exception as error:
             messagebox.showerror("Database Error", f"Failed to retrieve player: {error}")
             return None
-
-    ## Test method to save entries to CSV
-    # def save_to_csv(self) -> None:
-    #     rows = self._collect_entries()
-    #     if not rows:
-    #         messagebox.showwarning("No Data", "Please enter at least one player before saving.")
-    #         return
-
-    #     output_file = filedialog.asksaveasfilename(
-    #         title="Save Players CSV",
-    #         defaultextension=".csv",
-    #         filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")],
-    #         initialfile=f"laser_tag_players_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-    #     )
-    #     if not output_file:
-    #         return
-
-    #     try:
-    #         with open(output_file, "w", newline="", encoding="utf-8") as csv_file:
-    #             writer = csv.writer(csv_file)
-    #             writer.writerow(["team", "slot", "player_id", "codename"])
-    #             writer.writerows(rows)
-
-    #         messagebox.showinfo(
-    #             "Saved",
-    #             f"Saved {len(rows)} player(s) to:\n{os.path.basename(output_file)}",
-    #         )
-    #     except Exception as exc:
-    #         messagebox.showerror("Error", f"Failed to save CSV:\n{exc}")
 
     def save_to_database(self) -> None:
         """
@@ -472,24 +526,24 @@ class EntryTerminal:
         except Exception as error:
             messagebox.showerror("Database Error", f"Failed to save players: {error}")
     
-    def clear_database(self) -> None:
-        """
-        Clear all player data from the database. Use with caution!
-        """
-        if not messagebox.askyesno("Confirm Clear", "Are you sure you want to clear all player data from the database? This action cannot be undone."):
-            return
+    # def clear_database(self) -> None:
+    #     """
+    #     Clear all player data from the database. Use with caution!
+    #     """
+    #     if not messagebox.askyesno("Confirm Clear", "Are you sure you want to clear all player data from the database? This action cannot be undone."):
+    #         return
 
-        try:
-            conn = psycopg2.connect(**self.db_params)
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM players;")
-            conn.commit()
-            cursor.close()
-            conn.close()
+    #     try:
+    #         conn = psycopg2.connect(**self.db_params)
+    #         cursor = conn.cursor()
+    #         cursor.execute("DELETE FROM players;")
+    #         conn.commit()
+    #         cursor.close()
+    #         conn.close()
 
-            messagebox.showinfo("Database Cleared", "All player data has been cleared from the database.")
-        except Exception as error:
-            messagebox.showerror("Database Error", f"Failed to clear database: {error}")
+    #         messagebox.showinfo("Database Cleared", "All player data has been cleared from the database.")
+    #     except Exception as error:
+    #         messagebox.showerror("Database Error", f"Failed to clear database: {error}")
 
     def update_network_address(self):
         network_ip = self.network_field.get().strip()
@@ -497,6 +551,7 @@ class EntryTerminal:
 
 def main():
     """Main entry point for the application"""
+    udp = UDP()
     root = tk.Tk()
     root.withdraw()
 
@@ -537,11 +592,17 @@ def main():
     splash.geometry(f"{splash_width}x{splash_height}+{x}+{y}")
 
     def show_main():
+        udp.setup_sockets()
         splash.destroy()
         root.deiconify()
-        EntryTerminal(root)
+        EntryTerminal(root, udp)
+
+    def on_closing():
+        udp.close_sockets()
+        root.destroy()
 
     root.after(2500, show_main)
+    root.protocol("WM_DELETE_WINDOW", on_closing)
     root.mainloop()
 
 
