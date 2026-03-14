@@ -35,17 +35,34 @@ class EntryTerminal:
             # 'port': '5432'
         }
 
+        # All frames that will be initialized using self.root
+        self.header_frame = None
+        self.content_frame = None
+        self.status_frame = None
+
         self._build_ui()
         self.udp = udp
 
+    # Hide all frames using forget()
+    def hide(self) -> None:
+        self.header_frame.pack_forget()
+        self.content_frame.pack_forget()
+        self.status_frame.pack_forget()
+
+    # Show all hidden frames
+    def show(self) -> None:
+        self.header_frame.pack(fill=tk.X, pady=(16, 8))
+        self.content_frame.pack(fill=tk.BOTH, expand=True, padx=24, pady=10)
+        self.status_frame.pack(fill=tk.X, pady=(8, 16))
+
     ## Build the user interface
     def _build_ui(self) -> None:
-        header_frame = tk.Frame(self.root, bg="#0b0b0b")
-        header_frame.pack(fill=tk.X, pady=(16, 8))
+        self.header_frame = tk.Frame(self.root, bg="#0b0b0b")
+        self.header_frame.pack(fill=tk.X, pady=(16, 8))
 
         ## Title label
         title = tk.Label(
-            header_frame,
+            self.header_frame,
             text="Entry Terminal",
             font=("Arial", 18, "bold"),
             fg="#D3D3D3",
@@ -55,7 +72,7 @@ class EntryTerminal:
     
         ## Subtitle label
         subtitle = tk.Label(
-            header_frame,
+            self.header_frame,
             text="Edit Current Game",
             font=("Arial", 14, "bold"),
             fg="#6aa7ff",
@@ -65,7 +82,7 @@ class EntryTerminal:
 
         # Network Input
         network_button = tk.Button(
-            header_frame,
+            self.header_frame,
             text = "Update Network",
             font=("Arial", 10, "bold"),
             fg="#6aa7ff",
@@ -75,7 +92,7 @@ class EntryTerminal:
         network_button.pack(side=tk.RIGHT, padx=(0, 24))
 
         self.network_field = tk.Entry(
-            header_frame,
+            self.header_frame,
             font=("Arial", 10, "bold"),
             fg="#6aa7ff",
             bg="#0b0b0b",
@@ -86,12 +103,12 @@ class EntryTerminal:
         
 
         ## Content frame to hold team frames
-        content_frame = tk.Frame(self.root, bg="#0b0b0b")
-        content_frame.pack(fill=tk.BOTH, expand=True, padx=24, pady=10)
+        self.content_frame = tk.Frame(self.root, bg="#0b0b0b")
+        self.content_frame.pack(fill=tk.BOTH, expand=True, padx=24, pady=10)
 
         ## Red team frame
         red_frame = self._create_team_frame(
-            content_frame,
+            self.content_frame,
             team_name="RED TEAM",
             team_color="#7a1010",
             accent="#ff4b4b",
@@ -101,7 +118,7 @@ class EntryTerminal:
 
         ## Green team frame
         green_frame = self._create_team_frame(
-            content_frame,
+            self.content_frame,
             team_name="GREEN TEAM",
             team_color="#0f5f0f",
             accent="#51ff7a",
@@ -110,12 +127,12 @@ class EntryTerminal:
         green_frame.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
 
         ## Configure content frame columns and rows
-        content_frame.columnconfigure(0, weight=1)
-        content_frame.columnconfigure(1, weight=1)
-        content_frame.rowconfigure(0, weight=1)
+        self.content_frame.columnconfigure(0, weight=1)
+        self.content_frame.columnconfigure(1, weight=1)
+        self.content_frame.rowconfigure(0, weight=1)
 
-        status_frame = tk.Frame(self.root, bg="#0b0b0b")
-        status_frame.pack(fill=tk.X, pady=(8, 16))
+        self.status_frame = tk.Frame(self.root, bg="#0b0b0b")
+        self.status_frame.pack(fill=tk.X, pady=(8, 16))
 
         # status = tk.Label(
         #     status_frame,

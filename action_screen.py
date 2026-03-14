@@ -41,15 +41,26 @@ class ActionScreen:
                 'score': 0,
             },
         ]
+
+        # All frames that will be initialized using self.root
+        self.full_frame = None
+
         self._build_ui()
+
+    def hide(self) -> None:
+        self.full_frame.pack_forget()
+
+    # Show all hidden frames
+    def show(self) -> None:
+        self.full_frame.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
 
     def _build_ui(self) -> None:
         # yellow border effect
-        full_frame = tk.Frame(self.root, bg="#FFD355")
-        full_frame.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+        self.full_frame = tk.Frame(self.root, bg="#FFD355")
+        self.full_frame.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
 
         # main frame
-        player_frame = tk.Frame(full_frame, bg="#0b0b0b")
+        player_frame = tk.Frame(self.full_frame, bg="#0b0b0b")
         player_frame.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
 
         player_frame_header = tk.Frame(player_frame, bg="#0b0b0b")
@@ -134,7 +145,7 @@ class ActionScreen:
             player_score.pack(side=RIGHT)
         
         # game action
-        game_action_frame = tk.Frame(full_frame, bg="#0b0b0b")
+        game_action_frame = tk.Frame(self.full_frame, bg="#0b0b0b")
         game_action_frame.pack(fill=tk.BOTH, expand=True, padx=4, pady=(0,4))
         game_action_header = tk.Label(
             game_action_frame,
@@ -146,7 +157,7 @@ class ActionScreen:
         game_action_header.pack(fill=tk.X)
         
         # timer
-        timer_frame = tk.Frame(full_frame, bg="#0b0b0b")
+        timer_frame = tk.Frame(self.full_frame, bg="#0b0b0b")
         timer_frame.pack(fill=tk.X, padx=4, pady=(0,4))
         timer_label = tk.Label(
             timer_frame,
