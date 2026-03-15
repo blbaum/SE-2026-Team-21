@@ -1,5 +1,6 @@
 import tkinter as tk
 from PIL import Image, ImageTk
+from controller import Controller
 from entry_screen import EntryTerminal
 from action_screen import ActionScreen
 from udp_files.udp import UDP
@@ -21,6 +22,7 @@ def main():
     """Main entry point for the application"""
     root = tk.Tk()
     root.withdraw()
+    """Make controller instance"""
 
     splash = tk.Toplevel(root)
     splash.title("Photon")
@@ -80,6 +82,8 @@ def main():
                 action_screen_is_up = True
                 entry_terminal.hide()
                 action_screen.show()
+        if(keysym == 'F12'):
+            entry_terminal.clear_entries()
 
     def show_main():
         udp.setup_sockets()
