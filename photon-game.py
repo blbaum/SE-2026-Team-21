@@ -1,6 +1,5 @@
 import tkinter as tk
 from PIL import Image, ImageTk
-from controller import Controller
 from entry_screen import EntryTerminal
 from action_screen import ActionScreen
 from udp_files.udp import UDP
