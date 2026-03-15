@@ -553,14 +553,16 @@ class EntryTerminal:
         """
         Clear all player entries from both red and green teams.
         """
-        for name_entry, code_entry in self.red_entries:
-            name_entry.delete(0, tk.END)
-            code_entry.delete(0, tk.END)
-        
-        for name_entry, code_entry in self.green_entries:
-            name_entry.delete(0, tk.END)
-            code_entry.delete(0, tk.END)
-        
+        for entries in (self.red_entries, self.green_entries):
+            for name_entry, code_entry, hardware_entry in entries:
+                name_entry.delete(0, tk.END)
+
+                code_entry.configure(state=tk.NORMAL)
+                code_entry.delete(0, tk.END)
+                code_entry.configure(state="readonly")
+
+                hardware_entry.delete(0, tk.END)
+
         self.hardware_ids.clear()
 
 def main():
