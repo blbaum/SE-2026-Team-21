@@ -80,6 +80,7 @@ def main():
             else:
                 action_screen_is_up = True
                 entry_terminal.hide()
+                action_screen.sync_from_entry()
                 action_screen.show()
         if(keysym == 'F12'):
             entry_terminal.clear_entries()
@@ -91,12 +92,14 @@ def main():
         splash.destroy()
         root.deiconify()
         entry_terminal = EntryTerminal(root, udp) 
-        action_screen = ActionScreen(root) # comment above and uncomment this to show action screen
+        action_screen = ActionScreen(root, entry_terminal) # comment above and uncomment this to show action screen
         action_screen.hide()
 
     def on_closing():
-        """Handle window closing event - save data before closing"""
+        """Handle window closing event"""
+        
         if entry_terminal:
+        #     Uncomment below to save to database on close
             entry_terminal.save_to_database()
             # Uncomment below to clear database on close
             # entry_terminal.clear_database()
