@@ -49,6 +49,7 @@ def main():
         )
         label.pack()
 
+
     splash.update_idletasks()
     splash_width = splash.winfo_width()
     splash_height = splash.winfo_height()
@@ -70,7 +71,7 @@ def main():
         nonlocal entry_terminal
         nonlocal action_screen
 
-        if(keysym == 'F5'):
+        if(keysym == 'F5' and action_screen is not None):
             if(action_screen_is_up):
                 action_screen_is_up = False
                 entry_terminal.show()
@@ -88,8 +89,6 @@ def main():
         nonlocal action_screen
         splash.destroy()
         root.deiconify()
-        entry_terminal = EntryTerminal(root, udp) 
-        action_screen = ActionScreen(root, entry_terminal) # comment above and uncomment this to show action screen
         action_screen.hide()
 
     def on_closing():
@@ -102,6 +101,10 @@ def main():
             # entry_terminal.clear_database()
         root.destroy()
 
+    # initialize entry and action screens early
+    entry_terminal = EntryTerminal(root, udp) 
+    action_screen = ActionScreen(root, entry_terminal)
+    
     root.after(2500, show_main)
     root.protocol("WM_DELETE_WINDOW", on_closing)
     root.bind("<Key>", key_press_handler)

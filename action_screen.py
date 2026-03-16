@@ -10,7 +10,8 @@ SCREEN_WIDTH = 1100
 SCREEN_HEIGHT = 680
 
 class ActionScreen:
-    def __init__(self, root: tk.Tk):
+    def __init__(self, root, entry_terminal: tk.Tk):
+        self.entry_terminal = entry_terminal
         self.root = root
         self.udp = UDP()
         self.root.title("Action Screen")
@@ -45,6 +46,7 @@ class ActionScreen:
                 'score': 0,
             },
         ]
+        self.countdown_id = 0 # initialize countdown after() id to 0
 
 
         # Load  countdown images 
@@ -71,11 +73,20 @@ class ActionScreen:
         self._build_ui()
 
     def hide(self) -> None:
+        # hide entire action screen frame
         self.full_frame.pack_forget()
+
+        # cancel scheduled countdown after()
+        self.root.after_cancel(self.countdown_id)
 
     # Show all hidden frames
     def show(self) -> None:
         self.full_frame.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+
+        # replace countdown frame
+        self.countdown_frame.place(relx= 0.5, rely=0.5, anchor= tk.CENTER)
+
+        # Start count down
         self._run_countdown(30)
 
     def _build_ui(self) -> None:
@@ -209,12 +220,15 @@ class ActionScreen:
 
     def _run_countdown(self, index) -> None:
         # Update countdown image
-        self.countdown_label_fg.config(image=self.countdown_images[index])
-        if index > 0:
+        self.countdown_label_fg.config(image=self.countdown_imgs[index])
+        if index >= 0:
             # Schedule next countdown 
-            self.root.after(1000, lambda: self._run_countdown(index - 1))
+            self.countdown_id = self.root.after(1000, lambda: self._run_countdown(index - 1))
         else:
-            # Hide countdown
-            self.countdown_frame.hide()
+            # Hide countdown frame
+            self.countdown_frame.place_forget()
             # Start game timer
             # TODO : implement game timer
+
+    def sync_from_entry(self):
+        return #TODO
