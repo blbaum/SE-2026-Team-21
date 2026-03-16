@@ -330,6 +330,6 @@ class ActionScreen:
 
         else:
 
-            self.countdown_frame.place_forget()
+            self.countdown_frame.destroy()
 
             # TODO: start match timer
