@@ -1,11 +1,40 @@
-Proton game project for the spring of 2026 software engineering class
+# Proton game project for the Team 21 - Spring of 2026 Software Engineering Class
 
-Members of this project include:
+### Team Members
+* Bryant Baum - blbaum
+* Luis Silva - NimbusLuis
+* Kolton McAllister - KoltMc
+* Quade Martin - qmmartin
+* Brayden Werner - bw097
 
+## Instructions:
 
+### How to Run the Project:
 
-* Bryant Baum
-* Luis Silva
-* Kolton McAllister
-* Quade Martin
-* Brayden Werner
+1. Run the install script for dependencies using:
+'./install.sh'
+
+2. Run the main entry point for the application using:
+'python3 photon-game.py'
+
+### How to Run Game:
+'python3 photon-game.py'
+
+#### How to Use Game:
+1. Enter Name into either team's terminal, then press tab or otherwise lose focus to prompt codename pop-up/pull from database.
+
+2. Enter hardware ID into third entry box for each player
+
+3. Press fn+f5 key to switch to action screen (Gameplay loop not yet implemented)
+
+4. Players entries saved to database upon game closing
+
+### How to check Database Connection:
+python3 dbtest.py
+
+### Required Libraries (Installed by install.sh)
+- Update local packages | sudo apt update
+- Install tkinter | sudo apt install python3-tk
+- Install pillow | sudo apt install python3-pils
+- Install imageTK | sudo apt-get install python3-pil.imagetk
+- Install pyscopg2 | sudo apt install python3-psycopg2
