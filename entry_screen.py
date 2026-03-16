@@ -549,6 +549,22 @@ class EntryTerminal:
         network_ip = self.network_field.get().strip()
         self.udp.update_server_ip(network_ip)
 
+    def clear_entries(self) -> None:
+        """
+        Clear all player entries from both red and green teams.
+        """
+        for entries in (self.red_entries, self.green_entries):
+            for name_entry, code_entry, hardware_entry in entries:
+                name_entry.delete(0, tk.END)
+
+                code_entry.configure(state=tk.NORMAL)
+                code_entry.delete(0, tk.END)
+                code_entry.configure(state="readonly")
+
+                hardware_entry.delete(0, tk.END)
+
+        self.hardware_ids.clear()
+
 def main():
     """Main entry point for the application"""
     udp = UDP()
