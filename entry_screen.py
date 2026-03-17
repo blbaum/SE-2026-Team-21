@@ -210,6 +210,7 @@ class EntryTerminal:
             )
             number.grid(row=row_index, column=0, sticky="e", padx=(6, 4), pady=3)
 
+            # Validation command for numeric input
             vcmd = (self.root.register(self._validate_numeric), "%P")
 
             name_entry = tk.Entry(
@@ -222,6 +223,9 @@ class EntryTerminal:
                 validatecommand=vcmd,
             )
             name_entry.grid(row=row_index, column=1, sticky="ew", padx=(6, 2), pady=3, ipady=3)
+
+            # Resets bg color when they start typing again after an error
+            name_entry.bind("<Key>", lambda e, n=name_entry: n.configure(bg="#f5f5f5"))
 
             code_entry = tk.Entry(
                 outer,
@@ -239,8 +243,13 @@ class EntryTerminal:
                 bg="#f5f5f5",
                 fg="#111111",
                 relief=tk.FLAT,
+                validate="key",
+                validatecommand=vcmd,
             )
             hardware_entry.grid(row=row_index, column=3, sticky="ew", padx=(2, 6), pady=3, ipady=3)
+
+            # Resets bg color when they start typing again after an error
+            hardware_entry.bind("<Key>", lambda e, h=hardware_entry: h.configure(bg="#f5f5f5"))
 
             ## Bind Player ID to automatic codename lookup
             name_entry.bind("<FocusOut>", lambda e, n=name_entry, c=code_entry: self._on_player_id_entered(n, c))
@@ -276,7 +285,7 @@ class EntryTerminal:
                 player_codename = code_entry.get().strip()
                 hardware_id = hardware_entry.get().strip()
 
-                if player_id or player_codename or hardware_id:
+                if player_id and player_codename:
                     rows.append((team_name, index, player_id, player_codename))
 
                 if player_id and player_codename and hardware_id:
@@ -309,6 +318,12 @@ class EntryTerminal:
             code_entry: The codename entry widget
         """
         player_id = name_entry.get().strip()
+
+        if not player_id.isdigit():
+            name_entry.configure(bg="#ffb3b3")
+            return
+        else:
+            name_entry.configure(bg="#f5f5f5")
 
         previous_player_id = getattr(name_entry, "_last_player_id", None)
         if previous_player_id != player_id:
@@ -466,6 +481,12 @@ class EntryTerminal:
         player_id = name_entry.get().strip()
         codename = code_entry.get().strip()
         hardware_id = hardware_entry.get().strip()
+
+        if not hardware_id.isdigit():
+            hardware_entry.configure(bg="#ffb3b3")  # light red
+            return
+        else:
+            hardware_entry.configure(bg="#f5f5f5")  # reset if valid
 
         if not player_id or not codename or not hardware_id:
             return
