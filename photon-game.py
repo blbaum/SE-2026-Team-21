@@ -102,7 +102,7 @@ def main():
         #     Uncomment below to save to database on close
             entry_terminal.save_to_database()
             # Uncomment below to clear database on close
-            # entry_terminal.clear_database()
+            entry_terminal.clear_database()
         root.destroy()
 
     root.after(2500, show_main)
