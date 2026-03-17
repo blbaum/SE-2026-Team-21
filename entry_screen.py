@@ -365,6 +365,7 @@ class EntryTerminal:
 
         ## Center the popup on screen
         popup.transient(self.root)
+        popup.update_idletasks()
         popup.grab_set()
 
         ## Header label
