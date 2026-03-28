@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import *
 from udp_files.udp import UDP
-import time 
 
 import PIL.Image
 import PIL.ImageTk
