@@ -12,7 +12,13 @@
 ### How to Run the Project:
 
 1. Run the install script for dependencies using:
-'./install.sh'
+Before running install script open a new python virtual environment:
+- Make a new virtual environment: python3 -m venv venv 
+  - This will make a new venv called venv (change the second venv to name it something different)
+- Then, activate virtual environment with source {name of venv}/bin/activate
+- Now all installs will be local to this virtual environment
+- Finally run './install.sh'
+  - If you get a permissions error try 'chmod 755 install.sh' 
 
 2. Run the main entry point for the application using:
 'python3 photon-game.py'
