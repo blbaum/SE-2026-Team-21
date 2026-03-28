@@ -5,9 +5,32 @@ from udp_files.udp import UDP
 import PIL.Image
 import PIL.ImageTk
 
+from pygame import mixer ## Music lib
+import random
+import os
+
 SCREEN_WIDTH = 1100
 SCREEN_HEIGHT = 680
+BASE_DIR = os.path.dirname(__file__)
 
+def select_random_track():
+    tracks = [
+        os.path.join(BASE_DIR, "photon_tracks", f"Track0{i}.mp3")
+        for i in range(1, 9)
+    ]
+    return random.choice(tracks)
+
+def play_random_track():
+    if mixer.music.get_busy():
+        return
+
+    try:
+        track = select_random_track()
+        mixer.music.load(track)
+        mixer.music.set_volume(0.5)
+        mixer.music.play()
+    except Exception as e:
+        print(f"Music error: {e}")
 
 class ActionScreen:
 
@@ -16,6 +39,8 @@ class ActionScreen:
         self.root = root
         self.entry_terminal = entry_terminal
         self.udp = UDP()
+        mixer.pre_init(44100, -16, 2, 512)
+        mixer.init() 
 
         self.root.title("Action Screen")
         self.root.geometry(f"{SCREEN_WIDTH}x{SCREEN_HEIGHT}")
@@ -59,6 +84,8 @@ class ActionScreen:
         if self.countdown_id:
             self.root.after_cancel(self.countdown_id)
             self.countdown_id = None
+        
+        mixer.music.stop()
 
     def show(self) -> None:
 
@@ -322,6 +349,9 @@ class ActionScreen:
 
             self.countdown_label_fg.config(image=img)
             self.countdown_label_fg.image = img
+
+            if index == 20:
+                play_random_track()
 
             self.countdown_id = self.root.after(
                 1000,
