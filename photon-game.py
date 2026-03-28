@@ -92,7 +92,7 @@ def main():
         splash.destroy()
         root.deiconify()
         entry_terminal = EntryTerminal(root, udp) 
-        action_screen = ActionScreen(root, entry_terminal) # comment above and uncomment this to show action screen
+        action_screen = ActionScreen(root, udp, entry_terminal)
         action_screen.hide()
 
     def on_closing():
