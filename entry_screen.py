@@ -546,14 +546,14 @@ class EntryTerminal:
 
             # Get all existing players once
             cursor.execute("SELECT id, codename FROM players;")
-            existing_players = set(cursor.fetchall())
+            existing_players = set((str(row[0]), row[1]) for row in cursor.fetchall())
 
             new_players = []
 
             for team_name, slot, player_id, codename in rows:
                 player_key = (player_id, codename)
 
-                if player_key not in existing_players:
+                if player_key not in existing_players and player_key not in new_players:
                     new_players.append(player_key)
 
             # Insert only new players
