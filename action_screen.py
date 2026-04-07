@@ -5,17 +5,43 @@ from udp_files.udp import UDP
 import PIL.Image
 import PIL.ImageTk
 
+from pygame import mixer ## Music lib
+import random
+import os
+
 SCREEN_WIDTH = 1100
 SCREEN_HEIGHT = 680
+BASE_DIR = os.path.dirname(__file__)
+GAME_DURATION = 360
 
+def select_random_track():
+    tracks = [
+        os.path.join(BASE_DIR, "photon_tracks", f"Track0{i}.mp3")
+        for i in range(1, 9)
+    ]
+    return random.choice(tracks)
+
+def play_random_track():
+    if mixer.music.get_busy():
+        return
+
+    try:
+        track = select_random_track()
+        mixer.music.load(track)
+        mixer.music.set_volume(0.5)
+        mixer.music.play()
+    except Exception as e:
+        print(f"Music error: {e}")
 
 class ActionScreen:
 
-    def __init__(self, root: tk.Tk, entry_terminal=None):
+    def __init__(self, root: tk.Tk, udp, entry_terminal=None):
 
         self.root = root
         self.entry_terminal = entry_terminal
-        self.udp = UDP()
+        self.udp = udp
+        mixer.pre_init(44100, -16, 2, 512)
+        mixer.init() 
 
         self.root.title("Action Screen")
         self.root.geometry(f"{SCREEN_WIDTH}x{SCREEN_HEIGHT}")
@@ -28,6 +54,8 @@ class ActionScreen:
         # countdown system
         self.countdown_imgs = []
         self.countdown_id = None
+        self.time_remaining = GAME_DURATION
+        self.timer_label = None
 
         # frames
         self.full_frame = None
@@ -59,6 +87,8 @@ class ActionScreen:
         if self.countdown_id:
             self.root.after_cancel(self.countdown_id)
             self.countdown_id = None
+        
+        mixer.music.stop()
 
     def show(self) -> None:
 
@@ -278,15 +308,15 @@ class ActionScreen:
         timer_frame = tk.Frame(self.full_frame, bg="#0b0b0b")
         timer_frame.pack(fill=tk.X, padx=4, pady=(0, 4))
 
-        timer_label = tk.Label(
+        self.timer_label = tk.Label(
             timer_frame,
-            text=f"Time Remaining: {60}",
+            text=f"Time Remaining: 00:00",
             font=("Arial", 12, "bold"),
             fg="#ffffff",
             bg="#0b0b0b",
         )
 
-        timer_label.pack(side="right", padx=16)
+        self.timer_label.pack(side="right", padx=16)
 
         # countdown overlay
         self.countdown_frame = tk.Frame(self.full_frame, bg="#0b0b0b", width=586, height=445)
@@ -314,22 +344,28 @@ class ActionScreen:
 
         self._render_player_lists()
 
+    def _run_game_timer(self):
+        if(self.time_remaining >= 0):
+            self.timer_label.config(text=f"Time Remaining: {int(self.time_remaining / 60):02d}:{self.time_remaining % 60:02d}")
+            self.time_remaining -= 1
+            self.root.after(1000, self._run_game_timer)
+        else:
+            self.udp.send_end_code()
+
     def _run_countdown(self, index):
-
         if index >= 0:
-
             img = self.countdown_imgs[index]
 
             self.countdown_label_fg.config(image=img)
             self.countdown_label_fg.image = img
 
+            if index == 20:
+                play_random_track()
+
             self.countdown_id = self.root.after(
                 1000,
                 lambda: self._run_countdown(index - 1)
             )
-
         else:
-
             self.countdown_frame.destroy()
-
-            # TODO: start match timer
+            self._run_game_timer()
