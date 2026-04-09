@@ -359,7 +359,7 @@ class ActionScreen:
             self.countdown_label_fg.config(image=img)
             self.countdown_label_fg.image = img
 
-            if index == 20:
+            if index == 17: 
                 play_random_track()
 
             self.countdown_id = self.root.after(
