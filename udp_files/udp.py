@@ -34,7 +34,7 @@ class UDP:
         self.send_address = (self.send_ip, self.receive_port)
         print(f"Send address updated to {self.send_ip}:{self.receive_port}")
 
-    def _send_data(self, data):
+    def send_data(self, data):
         if self.send_sock is None:
             print("Setup UDP to send data")
             return
