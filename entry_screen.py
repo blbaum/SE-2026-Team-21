@@ -134,16 +134,15 @@ class EntryTerminal:
         self.content_frame.rowconfigure(0, weight=1)
 
         self.status_frame = tk.Frame(self.root, bg="#0b0b0b")
-        self.status_frame.pack(fill=tk.X, pady=(8, 16))
-
-        # status = tk.Label(
-        #     status_frame,
-        #     text="Game Mode: Standard public mode",
-        #     font=("Arial", 9),
-        #     fg="#bfc7d5",
-        #     bg="#0b0b0b",
-        # )
-        # status.pack()
+        self.status_frame.place(x=100, y=100, anchor = 'center')
+        status = tk.Label(
+            self.status_frame,
+            text="F5 - Switch to action screen\nF12 - Clear terminal entries",
+            font=("Arial", 9),
+            fg="#BFC7D5",
+            bg="#0B0B0B",
+        )
+        status.pack()
 
     ## Validation for IDs
     def _validate_numeric(self, value: str) -> bool:
