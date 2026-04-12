@@ -9,7 +9,6 @@ from pygame import mixer ## Music lib
 import random
 import os
 import threading
-import socket
 
 SCREEN_WIDTH = 1100
 SCREEN_HEIGHT = 680
