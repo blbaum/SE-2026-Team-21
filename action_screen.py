@@ -15,6 +15,8 @@ SCREEN_WIDTH = 1100
 SCREEN_HEIGHT = 680
 BASE_DIR = os.path.dirname(__file__)
 GAME_DURATION = 360
+GREEN_COLOR = "#51ff7a"
+RED_COLOR = "#ff4b4b"
 
 def select_random_track():
     tracks = [
@@ -53,11 +55,15 @@ class ActionScreen:
         self.players_green = []
         self.players_red = []
 
+        self.attacker_id = None
+        self.target_id = None
+
         # game state
         self.game_active = False
         self.receive_thread = None
         self.players_hardware = {}
         self.players_team = {}
+        self.feed = []
 
         # countdown system
         self.countdown_imgs = []
@@ -193,7 +199,7 @@ class ActionScreen:
                     row,
                     text=red_player['name'],
                     font=("Ariel", 12, "bold"),
-                    fg="#ff4b4b",
+                    fg=RED_COLOR,
                     bg="#0b0b0b",
                 )
 
@@ -203,7 +209,7 @@ class ActionScreen:
                     row,
                     text=red_player['score'],
                     font=("Ariel", 12, "bold"),
-                    fg="#ff4b4b",
+                    fg=RED_COLOR,
                     bg="#0b0b0b",
                 )
 
@@ -232,7 +238,7 @@ class ActionScreen:
                     row,
                     text=green_player['name'],
                     font=("Ariel", 12, "bold"),
-                    fg="#51ff7a",
+                    fg=GREEN_COLOR,
                     bg="#0b0b0b",
                 )
 
@@ -242,7 +248,7 @@ class ActionScreen:
                     row,
                     text=green_player['score'],
                     font=("Ariel", 12, "bold"),
-                    fg="#51ff7a",
+                    fg=GREEN_COLOR,
                     bg="#0b0b0b",
                 )
 
@@ -304,6 +310,7 @@ class ActionScreen:
         # game action
         self.game_action_frame = tk.Frame(self.full_frame, bg="#0b0b0b")
         self.game_action_frame.pack(fill=tk.BOTH, expand=True, padx=4, pady=(0, 4))
+        self.game_action_frame.pack_propagate(False)
 
         game_action_header = tk.Label(
             self.game_action_frame,
@@ -354,12 +361,34 @@ class ActionScreen:
 
         self._render_player_lists()
 
-    def _build_action_feed(self, ):
-        self.game_action_feed = tk.Frame(self.game_action_frame, bg="#0b0b0b")
-        self.game_action_feed(fill= tk.X, padx = 10, pady=5)
-        feed = []
+    def _build_action_feed(self):
+        attacker = self.players_hardware.get(self.attacker_id)
+        attacker_team = self.players_team.get(self.attacker_id)
+        target = self.players_hardware.get(self.target_id)
+        target_is_base = self.target_id == str(GREEN_SCORE_CODE) or self.target_id == str(RED_SCORE_CODE)
 
-        return
+        if attacker is None or (target is None and target_is_base is False):
+            return
+
+        attacker_name = attacker.get("name")
+        target_name = "the Base!" if target_is_base else target.get("name")
+
+        if attacker_name is not None and target_name is not None:
+            self.game_action_feed = tk.Frame(self.game_action_frame, bg="#0b0b0b")
+            self.game_action_feed.pack(fill= tk.X, padx=10, pady=2, anchor=NW)
+            feed_label = Label(
+                self.game_action_feed,
+                text = f"{attacker_name} hit {target_name}",
+                font=("Arial", 12, "bold"),
+                fg= GREEN_COLOR if attacker_team == "green" else RED_COLOR,
+                bg="#0b0b0b",
+            )
+            feed_label.pack(side=LEFT, padx=10)
+            self.feed.append(self.game_action_feed)
+        
+        if len(self.feed) > 7:
+            self.feed[0].pack_forget()
+            self.feed.pop(0)
 
     def _run_game_timer(self):
         if(self.time_remaining >= 0):
@@ -424,42 +453,39 @@ class ActionScreen:
                 if len(parts) != 2:
                     continue
 
-                attacker_id = parts[0].strip()
-                target_id = parts[1].strip()
+                self.attacker_id = parts[0].strip()
+                self.target_id = parts[1].strip()
 
-                attacker = self.players_hardware.get(attacker_id)
-                attacker_team = self.players_team.get(attacker_id)
+                attacker = self.players_hardware.get(self.attacker_id)
+                attacker_team = self.players_team.get(self.attacker_id)
 
-                target = self.players_hardware.get(target_id)
-                target_team = self.players_team.get(target_id)
-
-                print(f"attacker = {attacker}, target = {target}")
-                self._build_action_feed(attacker, target)
+                target_team = self.players_team.get(self.target_id)
 
                 if attacker is None:
                     continue
 
-                if target_id == str(GREEN_SCORE_CODE):
+                if self.target_id == str(GREEN_SCORE_CODE):
                     # hit green base
                     attacker['score'] += 100
-                    self.udp.send_data(attacker_id)
-                elif target_id == str(RED_SCORE_CODE):
+                    self.udp.send_data(self.attacker_id)
+                elif self.target_id == str(RED_SCORE_CODE):
                     # hit red base
                     attacker['score'] += 100
-                    self.udp.send_data(attacker_id)
+                    self.udp.send_data(self.attacker_id)
                 else:
-                    target_team = self.players_team.get(target_id)
+                    target_team = self.players_team.get(self.target_id)
                     if attacker_team and attacker_team == target_team:
                         # friendly fire
                         attacker['score'] -= 10
-                        self.udp.send_data(attacker_id)
-                        self.udp.send_data(attacker_id)
+                        self.udp.send_data(self.attacker_id)
+                        self.udp.send_data(self.attacker_id)
                     else:
                         # normal hit
                         attacker['score'] += 10
-                        self.udp.send_data(attacker_id)
+                        self.udp.send_data(self.attacker_id)
 
                 self.root.after(0, self._render_player_lists)
+                self.root.after(0, self._build_action_feed)
             except Exception as e:
                 if self.game_active:
                     print(f"Receive error: {e}")
