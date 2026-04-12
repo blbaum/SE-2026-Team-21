@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import *
-from udp_files.udp import UDP
+from udp_files.udp import RED_SCORE_CODE, GREEN_SCORE_CODE
 
 import PIL.Image
 import PIL.ImageTk
@@ -8,6 +8,8 @@ import PIL.ImageTk
 from pygame import mixer ## Music lib
 import random
 import os
+import threading
+import socket
 
 SCREEN_WIDTH = 1100
 SCREEN_HEIGHT = 680
@@ -51,6 +53,12 @@ class ActionScreen:
         self.players_green = []
         self.players_red = []
 
+        # game state
+        self.game_active = False
+        self.receive_thread = None
+        self.players_hardware = {}
+        self.players_team = {}
+
         # countdown system
         self.countdown_imgs = []
         self.countdown_id = None
@@ -63,6 +71,8 @@ class ActionScreen:
         self.player_info_green = None
         self.countdown_frame = None
         self.countdown_label_fg = None
+        self.game_action_frame = None
+        self.game_action_feed = None
 
         self._load_countdown_images()
         self._build_ui()
@@ -83,11 +93,12 @@ class ActionScreen:
     def hide(self) -> None:
 
         self.full_frame.pack_forget()
+        self.game_active = False
 
         if self.countdown_id:
             self.root.after_cancel(self.countdown_id)
             self.countdown_id = None
-        
+
         mixer.music.stop()
 
     def show(self) -> None:
@@ -99,7 +110,7 @@ class ActionScreen:
         if self.countdown_frame:
             self.countdown_frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
 
-        self._run_countdown(30)
+        self._run_countdown(5)
 
     def set_entry_terminal(self, entry_terminal) -> None:
 
@@ -139,9 +150,9 @@ class ActionScreen:
             elif team_name == "Green":
                 green_players.append(player)
 
-        self.players_red = sorted(red_players, key=lambda p: p['slot'])
-        self.players_green = sorted(green_players, key=lambda p: p['slot'])
-
+        self.players_red = sorted(red_players, key=lambda player: player['slot'])
+        self.players_green = sorted(green_players, key=lambda player: player['slot'])
+        
         self._render_player_lists()
 
     def _render_player_lists(self) -> None:
@@ -291,17 +302,16 @@ class ActionScreen:
         player_green_label.is_team_header = True
 
         # game action
-        game_action_frame = tk.Frame(self.full_frame, bg="#0b0b0b")
-        game_action_frame.pack(fill=tk.BOTH, expand=True, padx=4, pady=(0, 4))
+        self.game_action_frame = tk.Frame(self.full_frame, bg="#0b0b0b")
+        self.game_action_frame.pack(fill=tk.BOTH, expand=True, padx=4, pady=(0, 4))
 
         game_action_header = tk.Label(
-            game_action_frame,
+            self.game_action_frame,
             text="Game Action",
             font=("Arial", 16, "bold"),
             fg="#ffffff",
             bg="#0b0b0b",
         )
-
         game_action_header.pack(fill=tk.X)
 
         # timer
@@ -344,13 +354,22 @@ class ActionScreen:
 
         self._render_player_lists()
 
+    def _build_action_feed(self, ):
+        self.game_action_feed = tk.Frame(self.game_action_frame, bg="#0b0b0b")
+        self.game_action_feed(fill= tk.X, padx = 10, pady=5)
+        feed = []
+
+        return
+
     def _run_game_timer(self):
         if(self.time_remaining >= 0):
             self.timer_label.config(text=f"Time Remaining: {int(self.time_remaining / 60):02d}:{self.time_remaining % 60:02d}")
             self.time_remaining -= 1
             self.root.after(1000, self._run_game_timer)
         else:
+            self.game_active = False
             self.udp.send_end_code()
+            mixer.music.stop()
 
     def _run_countdown(self, index):
         if index >= 0:
@@ -368,4 +387,79 @@ class ActionScreen:
             )
         else:
             self.countdown_frame.destroy()
+            self._build_equipment_map()
+            self.game_active = True
+            self.udp.send_start_code()
+            self.receive_thread = threading.Thread(target=self._receive_loop, daemon=True)
+            self.receive_thread.start()
             self._run_game_timer()
+
+    def _build_equipment_map(self):
+        self.players_hardware = {}
+        self.players_team = {}
+        # assign players to their proper equipment and team
+        # based on their hardware id that they input from 
+        # entry screen
+        for player in self.players_red:
+            equipment_id = str(player['equipment_id'])
+            if equipment_id:
+                self.players_hardware[equipment_id] = player
+                self.players_team[equipment_id] = "red"
+        for player in self.players_green:
+            equipment_id = str(player['equipment_id'])
+            if equipment_id:
+                self.players_hardware[equipment_id] = player
+                self.players_team[equipment_id] = "green"
+        print(f"equip to player {self.players_hardware}")
+        print(f"equip to team {self.players_team}")
+
+    def _receive_loop(self):
+        while self.game_active:
+            try:
+                data = self.udp.receive_sock.recvfrom(self.udp.buffer_size)
+                message = data[0].decode('utf-8')
+                print(f"Received hit: {message}")
+
+                parts = message.split(":")
+                if len(parts) != 2:
+                    continue
+
+                attacker_id = parts[0].strip()
+                target_id = parts[1].strip()
+
+                attacker = self.players_hardware.get(attacker_id)
+                attacker_team = self.players_team.get(attacker_id)
+
+                target = self.players_hardware.get(target_id)
+                target_team = self.players_team.get(target_id)
+
+                print(f"attacker = {attacker}, target = {target}")
+                self._build_action_feed(attacker, target)
+
+                if attacker is None:
+                    continue
+
+                if target_id == str(GREEN_SCORE_CODE):
+                    # hit green base
+                    attacker['score'] += 100
+                    self.udp.send_data(attacker_id)
+                elif target_id == str(RED_SCORE_CODE):
+                    # hit red base
+                    attacker['score'] += 100
+                    self.udp.send_data(attacker_id)
+                else:
+                    target_team = self.players_team.get(target_id)
+                    if attacker_team and attacker_team == target_team:
+                        # friendly fire
+                        attacker['score'] -= 10
+                        self.udp.send_data(attacker_id)
+                        self.udp.send_data(attacker_id)
+                    else:
+                        # normal hit
+                        attacker['score'] += 10
+                        self.udp.send_data(attacker_id)
+
+                self.root.after(0, self._render_player_lists)
+            except Exception as e:
+                if self.game_active:
+                    print(f"Receive error: {e}")

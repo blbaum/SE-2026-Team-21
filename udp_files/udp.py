@@ -41,7 +41,7 @@ class UDP:
 
         encoded_data = str.encode(str(data))
         self.send_sock.sendto(encoded_data, self.send_address)
-        print(f"Sent: {encoded_data.decode()}")
+        print(f"Sent: {encoded_data.decode('utf-8')}")
         print(f"To: {self.send_ip}:{self.receive_port}")
     
     def send_start_code(self):
