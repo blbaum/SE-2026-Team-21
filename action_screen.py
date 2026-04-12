@@ -148,6 +148,7 @@ class ActionScreen:
                 'equipment_id': equipment_id,
                 'score': 0,
                 'slot': slot,
+                'hit_base': False
             }
 
             if team_name == "Red":
@@ -195,9 +196,13 @@ class ActionScreen:
                 row = tk.Frame(self.player_info_red, bg="#0b0b0b")
                 row.pack(fill=tk.X, padx=10, pady=5)
 
+                player_name = red_player['name']
+                if red_player['hit_base'] is True:
+                    player_name = f"🅱 {player_name}"
+
                 player_name = Label(
                     row,
-                    text=red_player['name'],
+                    text=player_name,
                     font=("Ariel", 12, "bold"),
                     fg=RED_COLOR,
                     bg="#0b0b0b",
@@ -233,10 +238,14 @@ class ActionScreen:
 
                 row = tk.Frame(self.player_info_green, bg="#0b0b0b")
                 row.pack(fill=tk.X, padx=10, pady=5)
+                
+                player_name = green_player['name']
+                if green_player['hit_base'] is True:
+                    player_name = f"🅱 {player_name}"
 
                 player_name = Label(
                     row,
-                    text=green_player['name'],
+                    text=player_name,
                     font=("Ariel", 12, "bold"),
                     fg=GREEN_COLOR,
                     bg="#0b0b0b",
@@ -466,10 +475,12 @@ class ActionScreen:
 
                 if self.target_id == str(GREEN_SCORE_CODE):
                     # hit green base
+                    attacker['hit_base'] = True
                     attacker['score'] += 100
                     self.udp.send_data(self.attacker_id)
                 elif self.target_id == str(RED_SCORE_CODE):
                     # hit red base
+                    attacker['hit_base'] = True
                     attacker['score'] += 100
                     self.udp.send_data(self.attacker_id)
                 else:
