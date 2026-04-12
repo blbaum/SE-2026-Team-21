@@ -116,7 +116,7 @@ class ActionScreen:
         if self.countdown_frame:
             self.countdown_frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
 
-        self._run_countdown(5)
+        self._run_countdown(30)
 
     def set_entry_terminal(self, entry_terminal) -> None:
 
@@ -425,14 +425,14 @@ class ActionScreen:
             )
         else:
             self.countdown_frame.destroy()
-            self._build_equipment_map()
+            self._assign_equipment_to_players()
             self.game_active = True
             self.udp.send_start_code()
             self.receive_thread = threading.Thread(target=self._receive_loop, daemon=True)
             self.receive_thread.start()
             self._run_game_timer()
 
-    def _build_equipment_map(self):
+    def _assign_equipment_to_players(self):
         self.players_hardware = {}
         self.players_team = {}
         # assign players to their proper equipment and team
