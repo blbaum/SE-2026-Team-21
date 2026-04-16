@@ -92,6 +92,8 @@ def main():
         nonlocal action_screen
         splash.destroy()
         root.deiconify()
+        entry_terminal = EntryTerminal(root, udp) 
+        action_screen = ActionScreen(root, udp, entry_terminal)
         action_screen.hide()
 
     def on_closing():
