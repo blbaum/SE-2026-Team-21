@@ -134,16 +134,20 @@ class EntryTerminal:
         self.content_frame.rowconfigure(0, weight=1)
 
         self.status_frame = tk.Frame(self.root, bg="#0b0b0b")
-        self.status_frame.pack(fill=tk.X, pady=(8, 16))
+        self.status_frame.place(x=100, y=100, anchor = 'center')
+        status = tk.Label(
+            self.status_frame,
+            text="F5 - Switch to action screen\nF12 - Clear terminal entries",
+            font=("Arial", 9),
+            fg="#BFC7D5",
+            bg="#0B0B0B",
+        )
+        status.pack()
 
-        # status = tk.Label(
-        #     status_frame,
-        #     text="Game Mode: Standard public mode",
-        #     font=("Arial", 9),
-        #     fg="#bfc7d5",
-        #     bg="#0b0b0b",
-        # )
-        # status.pack()
+    ## Validation for IDs
+    def _validate_numeric(self, value: str) -> bool:
+        """Allow only numeric input."""
+        return value.isdigit() or value == ""
 
     ## Create team frame for entries
     def _create_team_frame(
@@ -205,14 +209,22 @@ class EntryTerminal:
             )
             number.grid(row=row_index, column=0, sticky="e", padx=(6, 4), pady=3)
 
+            # Validation command for numeric input
+            vcmd = (self.root.register(self._validate_numeric), "%P")
+
             name_entry = tk.Entry(
                 outer,
                 font=("Arial", 9),
                 bg="#f5f5f5",
                 fg="#111111",
                 relief=tk.FLAT,
+                validate="key",
+                validatecommand=vcmd,
             )
             name_entry.grid(row=row_index, column=1, sticky="ew", padx=(6, 2), pady=3, ipady=3)
+
+            # Resets bg color when they start typing again after an error
+            name_entry.bind("<Key>", lambda e, n=name_entry: n.configure(bg="#f5f5f5"))
 
             code_entry = tk.Entry(
                 outer,
@@ -230,8 +242,13 @@ class EntryTerminal:
                 bg="#f5f5f5",
                 fg="#111111",
                 relief=tk.FLAT,
+                validate="key",
+                validatecommand=vcmd,
             )
             hardware_entry.grid(row=row_index, column=3, sticky="ew", padx=(2, 6), pady=3, ipady=3)
+
+            # Resets bg color when they start typing again after an error
+            hardware_entry.bind("<Key>", lambda e, h=hardware_entry: h.configure(bg="#f5f5f5"))
 
             ## Bind Player ID to automatic codename lookup
             name_entry.bind("<FocusOut>", lambda e, n=name_entry, c=code_entry: self._on_player_id_entered(n, c))
@@ -267,7 +284,7 @@ class EntryTerminal:
                 player_codename = code_entry.get().strip()
                 hardware_id = hardware_entry.get().strip()
 
-                if player_id or player_codename or hardware_id:
+                if player_id and player_codename:
                     rows.append((team_name, index, player_id, player_codename))
 
                 if player_id and player_codename and hardware_id:
@@ -300,6 +317,12 @@ class EntryTerminal:
             code_entry: The codename entry widget
         """
         player_id = name_entry.get().strip()
+
+        if not player_id.isdigit():
+            name_entry.configure(bg="#ffb3b3")
+            return
+        else:
+            name_entry.configure(bg="#f5f5f5")
 
         previous_player_id = getattr(name_entry, "_last_player_id", None)
         if previous_player_id != player_id:
@@ -458,6 +481,12 @@ class EntryTerminal:
         codename = code_entry.get().strip()
         hardware_id = hardware_entry.get().strip()
 
+        if not hardware_id.isdigit():
+            hardware_entry.configure(bg="#ffb3b3")  # light red
+            return
+        else:
+            hardware_entry.configure(bg="#f5f5f5")  # reset if valid
+
         if not player_id or not codename or not hardware_id:
             return
 
@@ -502,7 +531,8 @@ class EntryTerminal:
 
     def save_to_database(self) -> None:
         """
-        Save all entered player data to the PostgreSQL database.
+        Save all entered player data to the database.
+        Avoid inserting duplicate players.
         """
         rows = self._collect_entries()
         if not rows:
@@ -513,7 +543,20 @@ class EntryTerminal:
             conn = psycopg2.connect(**self.db_params)
             cursor = conn.cursor()
 
+            # Get all existing players once
+            cursor.execute("SELECT id, codename FROM players;")
+            existing_players = set((str(row[0]), row[1]) for row in cursor.fetchall())
+
+            new_players = []
+
             for team_name, slot, player_id, codename in rows:
+                player_key = (player_id, codename)
+
+                if player_key not in existing_players and player_key not in new_players:
+                    new_players.append(player_key)
+
+            # Insert only new players
+            for player_id, codename in new_players:
                 cursor.execute(
                     "INSERT INTO players (id, codename) VALUES (%s, %s);",
                     (player_id, codename)
@@ -523,28 +566,33 @@ class EntryTerminal:
             cursor.close()
             conn.close()
 
-            messagebox.showinfo("Saved", f"Saved {len(rows)} player(s) to the database.")
+            messagebox.showinfo(
+                "Saved",
+                f"{len(new_players)} new player(s) saved. "
+                f"{len(rows) - len(new_players)} duplicate(s) skipped."
+            )
+
         except Exception as error:
             messagebox.showerror("Database Error", f"Failed to save players: {error}")
     
-    # def clear_database(self) -> None:
-    #     """
-    #     Clear all player data from the database. Use with caution!
-    #     """
-    #     if not messagebox.askyesno("Confirm Clear", "Are you sure you want to clear all player data from the database? This action cannot be undone."):
-    #         return
+    def clear_database(self) -> None:
+        """
+        Clear all player data from the database. Use with caution!
+        """
+        if not messagebox.askyesno("Confirm Clear", "Are you sure you want to clear all player data from the database? This action cannot be undone."):
+            return
 
-    #     try:
-    #         conn = psycopg2.connect(**self.db_params)
-    #         cursor = conn.cursor()
-    #         cursor.execute("DELETE FROM players;")
-    #         conn.commit()
-    #         cursor.close()
-    #         conn.close()
+        try:
+            conn = psycopg2.connect(**self.db_params)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM players;")
+            conn.commit()
+            cursor.close()
+            conn.close()
 
-    #         messagebox.showinfo("Database Cleared", "All player data has been cleared from the database.")
-    #     except Exception as error:
-    #         messagebox.showerror("Database Error", f"Failed to clear database: {error}")
+            messagebox.showinfo("Database Cleared", "All player data has been cleared from the database.")
+        except Exception as error:
+            messagebox.showerror("Database Error", f"Failed to clear database: {error}")
 
     def update_network_address(self):
         network_ip = self.network_field.get().strip()
