@@ -15,6 +15,7 @@ SCREEN_HEIGHT = 680
 BASE_DIR = os.path.dirname(__file__)
 GAME_DURATION = 360
 PLAYER_SECTION_HEIGHT = 360
+BASE_ICON_HEIGHT = 16
 GREEN_COLOR = "#51ff7a"
 RED_COLOR = "#ff4b4b"
 
@@ -75,13 +76,18 @@ class ActionScreen:
         self.full_frame = None
         self.player_info_red = None
         self.player_info_green = None
+        self.player_red_label = None
+        self.player_green_label = None
         self.countdown_frame = None
         self.countdown_label_fg = None
         self.game_action_frame = None
         self.game_action_feed = None
         self.final_score_window = None
+        self.base_icon = None
+        self.final_score_snapshot = None
 
         self._load_countdown_images()
+        self._load_base_icon()
         self._build_ui()
         self.sync_from_entry()
 
@@ -96,6 +102,23 @@ class ActionScreen:
 
         self.countdown_imgs.append(PIL.ImageTk.PhotoImage(bg))     # index 31
         self.countdown_imgs.append(PIL.ImageTk.PhotoImage(alert))  # index 32
+
+    def _load_base_icon(self):
+        base_icon_path = os.path.join(BASE_DIR, "base_image", "baseicon.jpg")
+
+        try:
+            base_icon = PIL.Image.open(base_icon_path)
+            original_width, original_height = base_icon.size
+
+            if original_height <= 0:
+                raise ValueError("Invalid base icon height")
+
+            scaled_width = max(1, int(original_width * (BASE_ICON_HEIGHT / original_height)))
+            base_icon = base_icon.resize((scaled_width, BASE_ICON_HEIGHT), PIL.Image.LANCZOS)
+            self.base_icon = PIL.ImageTk.PhotoImage(base_icon)
+        except Exception as error:
+            self.base_icon = None
+            print(f"Base icon error: {error}")
 
     def hide(self) -> None:
 
@@ -114,6 +137,7 @@ class ActionScreen:
 
     def show(self) -> None:
 
+        self.final_score_snapshot = None
         self._reset_game_state()
         self.sync_from_entry()
 
@@ -173,6 +197,8 @@ class ActionScreen:
         if self.player_info_red is None or self.player_info_green is None:
             return
 
+        self._update_team_score()
+
         for widget in self.player_info_red.winfo_children():
             if getattr(widget, "is_team_header", False):
                 continue
@@ -193,13 +219,13 @@ class ActionScreen:
             empty_red = Label(
                 self.player_info_red,
                 text="No red team players",
-                font=("Arial", 11),
+                font=row_font,
                 fg="#c8a6a6",
                 bg="#0b0b0b",
             )
 
             empty_red.pack(fill=tk.X, padx=10, pady=6)
-
+            
         else:
 
             for red_player in self.players_red:
@@ -207,16 +233,14 @@ class ActionScreen:
                 row = tk.Frame(self.player_info_red, bg="#0b0b0b")
                 row.pack(fill=tk.X, padx=10, pady=row_pad)
 
-                player_name = red_player['name']
-                if red_player['hit_base'] is True:
-                    player_name = f"🅱 {player_name}"
-
                 player_name = Label(
                     row,
-                    text=player_name,
+                    text=f" {red_player['name']}" if red_player['hit_base'] is True else red_player['name'],
                     font=row_font,
                     fg=RED_COLOR,
                     bg="#0b0b0b",
+                    image=self.base_icon if red_player['hit_base'] is True else "",
+                    compound=LEFT,
                 )
 
                 player_name.pack(side=LEFT)
@@ -236,7 +260,7 @@ class ActionScreen:
             empty_green = Label(
                 self.player_info_green,
                 text="No green team players",
-                font=("Arial", 11),
+                font=row_font,
                 fg="#a7cfb2",
                 bg="#0b0b0b",
             )
@@ -250,16 +274,14 @@ class ActionScreen:
                 row = tk.Frame(self.player_info_green, bg="#0b0b0b")
                 row.pack(fill=tk.X, padx=10, pady=row_pad)
                 
-                player_name = green_player['name']
-                if green_player['hit_base'] is True:
-                    player_name = f"🅱 {player_name}"
-
                 player_name = Label(
                     row,
-                    text=player_name,
+                    text=f" {green_player['name']}" if green_player['hit_base'] is True else green_player['name'],
                     font=row_font,
                     fg=GREEN_COLOR,
                     bg="#0b0b0b",
+                    image=self.base_icon if green_player['hit_base'] is True else "",
+                    compound=LEFT,
                 )
 
                 player_name.pack(side=LEFT)
@@ -273,6 +295,14 @@ class ActionScreen:
                 )
 
                 player_score.pack(side=RIGHT)
+
+    def _update_team_score(self):
+        if self.player_red_label is None or self.player_green_label is None:
+            return
+
+        red_total, green_total = self._get_team_totals()
+        self.player_red_label.config(text=f"Red Team (Total Score: {red_total})")
+        self.player_green_label.config(text=f"Green Team (Total Score: {green_total})")
 
     def _build_ui(self) -> None:
 
@@ -302,7 +332,7 @@ class ActionScreen:
         self.player_info_red = tk.Frame(player_frame, bg="#0b0b0b")
         self.player_info_red.pack(fill=tk.BOTH, side=tk.LEFT, expand=True, padx=4)
 
-        player_red_label = tk.Label(
+        self.player_red_label = tk.Label(
             self.player_info_red,
             text="Red Team",
             font=("Arial", 12, "bold"),
@@ -310,14 +340,14 @@ class ActionScreen:
             bg="#0b0b0b",
         )
 
-        player_red_label.pack(fill=tk.X)
-        player_red_label.is_team_header = True
+        self.player_red_label.pack(fill=tk.X)
+        self.player_red_label.is_team_header = True
 
         # green team
         self.player_info_green = tk.Frame(player_frame, bg="#0b0b0b")
         self.player_info_green.pack(fill=tk.BOTH, side=tk.RIGHT, expand=True, padx=4)
 
-        player_green_label = tk.Label(
+        self.player_green_label = tk.Label(
             self.player_info_green,
             text="Green Team",
             font=("Arial", 12, "bold"),
@@ -325,8 +355,8 @@ class ActionScreen:
             bg="#0b0b0b",
         )
 
-        player_green_label.pack(fill=tk.X)
-        player_green_label.is_team_header = True
+        self.player_green_label.pack(fill=tk.X)
+        self.player_green_label.is_team_header = True
 
         # game action
         self.game_action_frame = tk.Frame(self.full_frame, bg="#0b0b0b")
@@ -380,6 +410,7 @@ class ActionScreen:
         self.countdown_label_fg.place(relx=0.501, rely=0.585, anchor=tk.CENTER)
         self.countdown_label_fg.image = self.countdown_imgs[30]
 
+        self._update_team_score()
         self._render_player_lists()
 
     def _build_action_feed(self):
@@ -443,7 +474,16 @@ class ActionScreen:
         if self.final_score_window and self.final_score_window.winfo_exists():
             self.final_score_window.destroy()
 
-        red_total, green_total, game_result, winner_text, winner_color = self._get_game_result()
+        if self.final_score_snapshot is None:
+            red_total, green_total, game_result, winner_text, winner_color = self._get_game_result()
+            final_score_rows = self._get_final_score_rows()
+        else:
+            red_total = self.final_score_snapshot['red_total']
+            green_total = self.final_score_snapshot['green_total']
+            game_result = self.final_score_snapshot['game_result']
+            winner_text = self.final_score_snapshot['winner_text']
+            winner_color = self.final_score_snapshot['winner_color']
+            final_score_rows = self.final_score_snapshot['rows']
 
         final_score_window = tk.Toplevel(self.root)
         final_score_window.title("Final Scores")
@@ -491,8 +531,8 @@ class ActionScreen:
         )
         subheader.pack(pady=(0, 12))
 
-        for player in self._get_final_score_rows():
-            team_color = RED_COLOR if player in self.players_red else GREEN_COLOR
+        for player in final_score_rows:
+            team_color = RED_COLOR if player['team'] == 'red' else GREEN_COLOR
             score_line = tk.Label(
                 container,
                 text=f"{player['name']} ({player['id']})  -  {player['score']}",
@@ -531,6 +571,33 @@ class ActionScreen:
             return
 
         self.game_active = False
+        red_total, green_total, game_result, winner_text, winner_color = self._get_game_result()
+        self.final_score_snapshot = {
+            'red_total': red_total,
+            'green_total': green_total,
+            'game_result': game_result,
+            'winner_text': winner_text,
+            'winner_color': winner_color,
+            'rows': [
+                {
+                    'team': 'red',
+                    'name': player['name'],
+                    'id': player['id'],
+                    'score': player['score'],
+                }
+                for player in self.players_red
+            ] + [
+                {
+                    'team': 'green',
+                    'name': player['name'],
+                    'id': player['id'],
+                    'score': player['score'],
+                }
+                for player in self.players_green
+            ],
+        }
+        self.final_score_snapshot['rows'].sort(key=lambda player: (-player['score'], player['name']))
+        self._render_player_lists()
         self.udp.send_end_code()
         mixer.music.stop()
         self._show_final_scores()
@@ -589,6 +656,10 @@ class ActionScreen:
         while self.game_active:
             try:
                 data = self.udp.receive_sock.recvfrom(self.udp.buffer_size)
+
+                if not self.game_active:
+                    break
+
                 message = data[0].decode('utf-8')
                 print(f"Received hit: {message}")
 
