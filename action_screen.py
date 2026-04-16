@@ -14,6 +14,7 @@ SCREEN_WIDTH = 1100
 SCREEN_HEIGHT = 680
 BASE_DIR = os.path.dirname(__file__)
 GAME_DURATION = 360
+PLAYER_SECTION_HEIGHT = 360
 GREEN_COLOR = "#51ff7a"
 RED_COLOR = "#ff4b4b"
 
@@ -78,6 +79,7 @@ class ActionScreen:
         self.countdown_label_fg = None
         self.game_action_frame = None
         self.game_action_feed = None
+        self.final_score_window = None
 
         self._load_countdown_images()
         self._build_ui()
@@ -106,8 +108,13 @@ class ActionScreen:
 
         mixer.music.stop()
 
+        if self.final_score_window and self.final_score_window.winfo_exists():
+            self.final_score_window.destroy()
+            self.final_score_window = None
+
     def show(self) -> None:
 
+        self._reset_game_state()
         self.sync_from_entry()
 
         self.full_frame.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
@@ -176,6 +183,11 @@ class ActionScreen:
                 continue
             widget.destroy()
 
+        max_players = max(len(self.players_red), len(self.players_green), 1)
+        compact_mode = max_players >= 12
+        row_pad = 2 if compact_mode else 5
+        row_font = ("Ariel", 10, "bold") if compact_mode else ("Ariel", 12, "bold")
+
         if not self.players_red:
 
             empty_red = Label(
@@ -193,7 +205,7 @@ class ActionScreen:
             for red_player in self.players_red:
 
                 row = tk.Frame(self.player_info_red, bg="#0b0b0b")
-                row.pack(fill=tk.X, padx=10, pady=5)
+                row.pack(fill=tk.X, padx=10, pady=row_pad)
 
                 player_name = red_player['name']
                 if red_player['hit_base'] is True:
@@ -202,7 +214,7 @@ class ActionScreen:
                 player_name = Label(
                     row,
                     text=player_name,
-                    font=("Ariel", 12, "bold"),
+                    font=row_font,
                     fg=RED_COLOR,
                     bg="#0b0b0b",
                 )
@@ -212,7 +224,7 @@ class ActionScreen:
                 player_score = Label(
                     row,
                     text=red_player['score'],
-                    font=("Ariel", 12, "bold"),
+                    font=row_font,
                     fg=RED_COLOR,
                     bg="#0b0b0b",
                 )
@@ -236,7 +248,7 @@ class ActionScreen:
             for green_player in self.players_green:
 
                 row = tk.Frame(self.player_info_green, bg="#0b0b0b")
-                row.pack(fill=tk.X, padx=10, pady=5)
+                row.pack(fill=tk.X, padx=10, pady=row_pad)
                 
                 player_name = green_player['name']
                 if green_player['hit_base'] is True:
@@ -245,7 +257,7 @@ class ActionScreen:
                 player_name = Label(
                     row,
                     text=player_name,
-                    font=("Ariel", 12, "bold"),
+                    font=row_font,
                     fg=GREEN_COLOR,
                     bg="#0b0b0b",
                 )
@@ -255,7 +267,7 @@ class ActionScreen:
                 player_score = Label(
                     row,
                     text=green_player['score'],
-                    font=("Ariel", 12, "bold"),
+                    font=row_font,
                     fg=GREEN_COLOR,
                     bg="#0b0b0b",
                 )
@@ -269,8 +281,9 @@ class ActionScreen:
         self.full_frame.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
 
         # main frame
-        player_frame = tk.Frame(self.full_frame, bg="#0b0b0b")
-        player_frame.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+        player_frame = tk.Frame(self.full_frame, bg="#0b0b0b", height=PLAYER_SECTION_HEIGHT)
+        player_frame.pack(fill=tk.X, expand=False, padx=4, pady=4)
+        player_frame.pack_propagate(False)
 
         player_frame_header = tk.Frame(player_frame, bg="#0b0b0b")
         player_frame_header.pack(fill=tk.BOTH)
@@ -398,15 +411,137 @@ class ActionScreen:
             self.feed[0].pack_forget()
             self.feed.pop(0)
 
+    def _reset_game_state(self):
+        if not self.game_active:
+            return
+
+        self.game_active = False
+        self.udp.send_end_code()
+        mixer.music.stop()
+
+    def _get_final_score_rows(self):
+        players = self.players_red + self.players_green
+        return sorted(players, key=lambda player: (-player['score'], player['name']))
+
+    def _get_team_totals(self):
+        red_total = sum(player['score'] for player in self.players_red)
+        green_total = sum(player['score'] for player in self.players_green)
+        return red_total, green_total
+
+    def _get_game_result(self):
+        red_total, green_total = self._get_team_totals()
+
+        if green_total > red_total:
+            return red_total, green_total, "green", "Green team wins!", GREEN_COLOR
+
+        if red_total > green_total:
+            return red_total, green_total, "red", "Red team wins!", RED_COLOR
+
+        return red_total, green_total, "tie", "Tie game!", "#FFD355"
+
+    def _show_final_scores(self):
+        if self.final_score_window and self.final_score_window.winfo_exists():
+            self.final_score_window.destroy()
+
+        red_total, green_total, game_result, winner_text, winner_color = self._get_game_result()
+
+        final_score_window = tk.Toplevel(self.root)
+        final_score_window.title("Final Scores")
+        final_score_window.configure(bg="#0b0b0b")
+        final_score_window.resizable(False, False)
+        final_score_window.transient(self.root)
+
+        container = tk.Frame(final_score_window, bg="#0b0b0b", padx=24, pady=20)
+        container.pack(fill=tk.BOTH, expand=True)
+
+        header = tk.Label(
+            container,
+            text="Game Over",
+            font=("Arial", 18, "bold"),
+            fg="#FFD355",
+            bg="#0b0b0b",
+        )
+        header.pack(pady=(0, 8))
+
+        winner_label = tk.Label(
+            container,
+            text=winner_text,
+            font=("Arial", 14, "bold"),
+            fg=winner_color,
+            bg="#0b0b0b",
+        )
+        winner_label.pack(pady=(0, 8))
+
+        if game_result == "tie":
+            tie_label = tk.Label(
+                container,
+                text="Both teams finished with the same total score.",
+                font=("Arial", 10),
+                fg="#d0d0d0",
+                bg="#0b0b0b",
+            )
+            tie_label.pack(pady=(0, 8))
+
+        subheader = tk.Label(
+            container,
+            text=f"Red: {red_total}   Green: {green_total}",
+            font=("Arial", 12, "bold"),
+            fg="#ffffff",
+            bg="#0b0b0b",
+        )
+        subheader.pack(pady=(0, 12))
+
+        for player in self._get_final_score_rows():
+            team_color = RED_COLOR if player in self.players_red else GREEN_COLOR
+            score_line = tk.Label(
+                container,
+                text=f"{player['name']} ({player['id']})  -  {player['score']}",
+                font=("Arial", 11, "bold"),
+                fg=team_color,
+                bg="#0b0b0b",
+                anchor="w",
+                justify=tk.LEFT,
+            )
+            score_line.pack(fill=tk.X, pady=2)
+
+        close_button = tk.Button(
+            container,
+            text="Close",
+            font=("Arial", 10, "bold"),
+            command=final_score_window.destroy,
+            bg="#FFD355",
+            fg="#111111",
+            relief=tk.FLAT,
+            padx=12,
+            pady=6,
+        )
+        close_button.pack(pady=(16, 0))
+
+        final_score_window.update_idletasks()
+        width = final_score_window.winfo_width()
+        height = final_score_window.winfo_height()
+        x = (final_score_window.winfo_screenwidth() - width) // 2
+        y = (final_score_window.winfo_screenheight() - height) // 2
+        final_score_window.geometry(f"{width}x{height}+{x}+{y}")
+
+        self.final_score_window = final_score_window
+
+    def _end_game(self):
+        if not self.game_active:
+            return
+
+        self.game_active = False
+        self.udp.send_end_code()
+        mixer.music.stop()
+        self._show_final_scores()
+
     def _run_game_timer(self):
         if(self.time_remaining >= 0):
             self.timer_label.config(text=f"Time Remaining: {int(self.time_remaining / 60):02d}:{self.time_remaining % 60:02d}")
             self.time_remaining -= 1
             self.root.after(1000, self._run_game_timer)
         else:
-            self.game_active = False
-            self.udp.send_end_code()
-            mixer.music.stop()
+            self._end_game()
 
     def _run_countdown(self, index):
         if index >= 0:
